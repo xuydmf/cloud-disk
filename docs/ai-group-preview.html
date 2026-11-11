@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI 自动分组 · 界面预览</title>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: flex;
+    background: #F4F4F6;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  /* 左侧模拟真实侧边栏（深色 rail） */
+  .rail {
+    width: 240px;
+    flex: none;
+    padding: 18px 12px;
+    background: #17181C;
+  }
+  .rail-title {
+    margin: 0 0 10px 8px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #5A5E67;
+  }
+  .main { flex: 1; padding: 22px 26px; }
+
+  /* 分组 chip 是 button，这里只做布局，样式全走真实 style.css */
+  .group-chip { cursor: default; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    max-width: 720px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #E6E7EB;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card-thumb {
+    height: 96px;
+    background: linear-gradient(135deg, #E8E9F2, #D6D8E8);
+  }
+  .card-body { padding: 9px 11px 11px; display: flex; flex-direction: column; }
+  .card-name { font-size: 12.5px; font-weight: 560; color: #16181C; }
+  .card-meta { font-family: var(--mono); font-size: 10.5px; color: #8A8F99; padding-top: 6px; margin-top: auto; }
+
+  .legend { margin-top: 20px; font-size: 12px; color: #6B7079; line-height: 2; }
+  .legend b { color: #16181C; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="rail">
+  <p class="rail-title">Groups</p>
+  <div class="groups" id="groups"></div>
+</div>
+
+<div class="main">
+  <div class="grid" id="cards"></div>
+  <div class="legend">
+    <div><b>相机图标常亮</b> = 该分组已设置样貌参考图，会参与 AI 自动识别</div>
+    <div><b>相机图标暗色</b> = 未设置，鼠标移上去才显示，点击可上传</div>
+    <div><b>卡片上的 AI 标签</b> = 这张图是被自动归入当前分组的</div>
+  </div>
+</div>
+
+<script>
+const camera = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8.6h2.4l1.3-2.1h6.6l1.3 2.1h2.4a1.9 1.9 0 0 1 1.9 1.9v7a1.9 1.9 0 0 1-1.9 1.9H4.5a1.9 1.9 0 0 1-1.9-1.9v-7a1.9 1.9 0 0 1 1.9-1.9Z"/><circle cx="12" cy="13.4" r="2.8"/></svg>';
+const folder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.2A2.2 2.2 0 0 1 5.2 6h3.4l1.8 2h8.4A2.2 2.2 0 0 1 21 10.2v7.6A2.2 2.2 0 0 1 18.8 20H5.2A2.2 2.2 0 0 1 3 17.8V8.2Z"/></svg>';
+const close = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+const sparkle = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.6l1.6 4.3 4.3 1.6-4.3 1.6L11 15.4 9.4 11.1 5.1 9.5l4.3-1.6L11 3.6Z"/><path d="M18 14.6l.75 2 2 .75-2 .75-.75 2-.75-2-2-.75 2-.75.75-2Z"/></svg>';
+
+// 分组：两个已设参考图（点亮），一个未设置
+const groups = [
+    { name: '许耀东', count: 12, hasRef: true, active: true },
+    { name: '张三',   count: 8,  hasRef: true },
+    { name: '李四',   count: 3,  hasRef: false }
+];
+
+const bar = document.getElementById('groups');
+groups.forEach((g) => {
+    const chip = document.createElement('button');
+    chip.className = 'group-chip' + (g.active ? ' active' : '');
+    chip.innerHTML =
+        '<span class="gico">' + folder + '</span>' +
+        '<span class="glabel">' + g.name + '</span>' +
+        '<span class="gcount">' + g.count + '</span>' +
+        '<span class="ref' + (g.hasRef ? ' has' : '') + '">' + camera + '</span>' +
+        '<span class="del">' + close + '</span>';
+    bar.appendChild(chip);
+});
+
+// 文件卡：两张识别归组、一张普通
+const cards = [
+    { name: 'IMG_7401.jpeg', meta: '2.2 MB · 10-30 11:07', ai: true },
+    { name: 'IMG_7403.jpeg', meta: '3.1 MB · 10-30 11:06', ai: true },
+    { name: '会议纪要.pdf',  meta: '208 KB · 10-30 09:12', ai: false }
+];
+
+document.getElementById('cards').innerHTML = cards.map((c) =>
+    '<div class="card">' +
+        '<div class="card-thumb"></div>' +
+        '<div class="card-body">' +
+            '<div class="card-name">' + c.name + '</div>' +
+            (c.ai ? '<div class="card-ai">' + sparkle + '<span>AI 自动分组</span></div>' : '') +
+            '<div class="card-meta">' + c.meta + '</div>' +
+        '</div>' +
+    '</div>'
+).join('');
+</script>
+</body>
+</html>

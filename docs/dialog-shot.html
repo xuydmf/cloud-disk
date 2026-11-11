@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<title>shot</title>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+<style>
+    body { background: #E9EAEF; margin: 0; height: 100vh; }
+</style>
+</head>
+<body>
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+// 根据 ?v= 参数自动弹一个变体，供无头 Chrome 截图
+const v = new URLSearchParams(location.search).get('v');
+
+const CASES = {
+    danger: () => uiConfirm({
+        icon: 'trash', danger: true, eyebrow: 'Danger',
+        title: '彻底删除此文件？',
+        sub: 'IMG_7401.jpeg · 2.4 MB',
+        note: '此操作<strong>不可撤销</strong>，文件将被永久从磁盘移除，回收站中不再保留。',
+        okText: '彻底删除'
+    }),
+    clear: () => uiConfirm({
+        icon: 'trash', danger: true, eyebrow: 'Danger',
+        title: '清空回收站？',
+        sub: '共 37 个文件',
+        note: '回收站内<strong>全部 37 个文件</strong>将被永久删除，且无法恢复。',
+        okText: '清空回收站'
+    }),
+    confirm: () => uiConfirm({
+        icon: 'trash', eyebrow: 'Delete',
+        title: '删除此文件？',
+        sub: 'IMG_7401.jpeg',
+        note: '文件会移入<strong>回收站</strong>，7 天内可随时恢复。',
+        okText: '移入回收站'
+    }),
+    batch: () => uiConfirm({
+        icon: 'trash', eyebrow: 'Delete · 8 items',
+        title: '删除选中的 8 个文件？',
+        sub: '合计 42.6 MB',
+        note: '这些文件会移入<strong>回收站</strong>，7 天内可随时恢复。',
+        okText: '移入回收站'
+    }),
+    group: () => uiPrompt({
+        icon: 'folderPlus', eyebrow: 'New group',
+        title: '新建分组',
+        sub: '分组用于归档文件，可随时改名或删除',
+        label: '分组名称', value: '设计稿',
+        placeholder: '例如：合同文档', maxlength: 40,
+        hint: '最多 40 个字符', okText: '创建'
+    }),
+    rename: () => uiPrompt({
+        icon: 'pencil', eyebrow: 'Rename',
+        title: '重命名文件', sub: 'IMG_7401.jpeg',
+        label: '新文件名', value: 'IMG_7401.jpeg',
+        placeholder: '输入新文件名',
+        hint: '包含扩展名，例如 报告.pdf', maxlength: 200,
+        validate: (x) => (/[/\\:*?"<>|]/.test(x) ? '文件名不能包含 \\ / : * ? " < > |' : '')
+    }),
+    invalid: () => {
+        // 输入非法字符后点确定，展示错误态
+        uiPrompt({
+            icon: 'pencil', eyebrow: 'Rename',
+            title: '重命名文件', sub: 'IMG_7401.jpeg',
+            label: '新文件名', value: 'a/b:*.pdf',
+            hint: '包含扩展名，例如 报告.pdf', maxlength: 200,
+            validate: (x) => (/[/\\:*?"<>|]/.test(x) ? '文件名不能包含 \\ / : * ? " < > |' : '')
+        });
+        setTimeout(() => {
+            const b = document.querySelector('[data-act="ok"]');
+            if (b) b.click();
+        }, 60);
+    }
+};
+
+if (CASES[v]) CASES[v]();
+</script>
+</body>
+</html>

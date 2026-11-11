@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>dialog.js 运行时自检</title>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+<style>
+    body { background: #E9EAEF; margin: 0; font-family: var(--font); }
+    .bar {
+        display: flex; gap: 8px; flex-wrap: wrap;
+        padding: 16px; background: #fff; border-bottom: 1px solid var(--line);
+    }
+    .bar button {
+        height: 32px; padding: 0 13px; border-radius: var(--r-md);
+        border: 1px solid var(--line-strong); background: #fff;
+        font-family: inherit; font-size: 12.5px; font-weight: 550;
+        color: var(--text-2); cursor: pointer;
+    }
+    .bar button:hover { background: #F1F2F5; color: var(--text); }
+    #out { padding: 16px; font-family: var(--mono); font-size: 12px; color: #5B616B; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+    <button onclick="tDanger()">danger 彻底删除</button>
+    <button onclick="tConfirm()">confirm 普通删除</button>
+    <button onclick="tBatch()">confirm 批量</button>
+    <button onclick="tPrompt()">prompt 新建分组</button>
+    <button onclick="tPromptRename()">prompt 重命名</button>
+    <button onclick="tEmpty()">prompt 空值校验</button>
+    <button onclick="tEsc()">Esc 取消</button>
+    <button onclick="tEnter()">Enter 提交</button>
+</div>
+
+<div id="out">等待测试…</div>
+
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+const log = (s) => { document.getElementById('out').textContent += '\n' + s; };
+document.getElementById('out').textContent = 'dialog.js loaded: ' + (typeof window.uiConfirm) + ' / ' + (typeof window.uiPrompt);
+
+function tDanger() {
+    uiConfirm({
+        icon: 'trash', danger: true, eyebrow: 'Danger',
+        title: '彻底删除此文件？',
+        sub: 'IMG_7401.jpeg · 2.4 MB',
+        note: '此操作<strong>不可撤销</strong>，文件将被永久从磁盘移除，回收站中不再保留。',
+        okText: '彻底删除'
+    }).then((r) => log('danger → ' + r));
+}
+
+function tConfirm() {
+    uiConfirm({
+        icon: 'trash', eyebrow: 'Delete',
+        title: '删除此文件？',
+        sub: 'IMG_7401.jpeg',
+        note: '文件会移入<strong>回收站</strong>，7 天内可随时恢复。',
+        okText: '移入回收站'
+    }).then((r) => log('confirm → ' + r));
+}
+
+function tBatch() {
+    uiConfirm({
+        icon: 'trash', eyebrow: 'Delete · 8 items',
+        title: '删除选中的 8 个文件？',
+        sub: '合计 42.6 MB',
+        note: '这些文件会移入<strong>回收站</strong>，7 天内可随时恢复。',
+        okText: '移入回收站'
+    }).then((r) => log('batch → ' + r));
+}
+
+function tPrompt() {
+    uiPrompt({
+        icon: 'folderPlus', eyebrow: 'New group',
+        title: '新建分组', sub: '分组用于归档文件，可随时改名或删除',
+        label: '分组名称', value: '', placeholder: '例如：合同文档',
+        maxlength: 40, hint: '最多 40 个字符', okText: '创建'
+    }).then((r) => log('prompt → ' + JSON.stringify(r)));
+}
+
+function tPromptRename() {
+    uiPrompt({
+        icon: 'pencil', eyebrow: 'Rename',
+        title: '重命名文件', sub: 'IMG_7401.jpeg',
+        label: '新文件名', value: 'IMG_7401.jpeg',
+        placeholder: '输入新文件名', hint: '包含扩展名，例如 报告.pdf',
+        maxlength: 200,
+        validate: (v) => (/[/\\:*?"<>|]/.test(v) ? '文件名不能包含 \\ / : * ? " < > |' : '')
+    }).then((r) => log('rename → ' + JSON.stringify(r)));
+}
+
+function tEmpty() {
+    uiPrompt({
+        icon: 'folderPlus', eyebrow: 'New group',
+        title: '新建分组', label: '分组名称', value: '',
+        placeholder: '例如：合同文档', hint: '最多 40 个字符',
+        okText: '创建'
+    }).then((r) => log('empty → ' + JSON.stringify(r)));
+}
+
+function tEsc() {
+    uiConfirm({
+        icon: 'trash', eyebrow: 'Test', title: '按 Esc 取消',
+        note: '这个应该返回 false', okText: '确定'
+    }).then((r) => log('esc → ' + r));
+}
+
+function tEnter() {
+    uiPrompt({
+        icon: 'folderPlus', eyebrow: 'Test', title: '按 Enter 提交',
+        label: '名称', value: '测试值', hint: '', okText: '创建'
+    }).then((r) => log('enter → ' + JSON.stringify(r)));
+}
+</script>
+</body>
+</html>

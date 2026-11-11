@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>三选一弹框断言 v2</title>
+<style>body{font:14px/1.6 system-ui,sans-serif;padding:20px}pre{background:#fff;border:1px solid #ddd;padding:12px}</style>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+</head>
+<body>
+<pre id="r">running...</pre>
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+(function () {
+  var out = [];
+  function log(s) { out.push(s); document.getElementById('r').textContent = out.join('\n'); }
+  function press(key) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+  }
+
+  var steps = [];
+  function step(name, fn) { steps.push({ name: name, fn: fn }); }
+
+  function mk() {
+    return uiConfirm({
+      icon: 'trash', eyebrow: 'Delete group', title: '删除分组「测试」？',
+      sub: '该分组下有 3 个文件', note: '说明', danger: true,
+      altText: '仅删除分组', okText: '同时删除文件'
+    });
+  }
+
+  step('T1-three-buttons', function (done) {
+    var p = mk();
+    setTimeout(function () {
+      var d = document.querySelector('.modal-confirm');
+      log('T1 three-buttons: ' + (d.querySelectorAll('.form-actions .btn').length === 3));
+      log('T1 alt-exists: ' + !!d.querySelector('[data-act="alt"]'));
+      log('T1 alt-text-ok: ' + (d.querySelector('[data-act="alt"]').textContent.trim() === '仅删除分组'));
+      d.querySelector('[data-act="alt"]').click();
+      p.then(function (v) { log('T2 alt-resolves: ' + (v === 'alt')); done(); });
+    }, 60);
+  });
+
+  step('T3-ok-true', function (done) {
+    var p = mk();
+    setTimeout(function () {
+      document.querySelector('[data-act="ok"]').click();
+      p.then(function (v) { log('T3 ok-resolves-true: ' + (v === true)); done(); });
+    }, 60);
+  });
+
+  step('T4-esc-false', function (done) {
+    var p = mk();
+    setTimeout(function () {
+      press('Escape');
+      p.then(function (v) { log('T4 esc-resolves-false: ' + (v === false)); done(); });
+    }, 60);
+  });
+
+  step('T5-enter-on-alt', function (done) {
+    var p = mk();
+    setTimeout(function () {
+      document.querySelector('[data-act="alt"]').focus();
+      press('Enter');
+      p.then(function (v) { log('T5 enter-on-alt: ' + (v === 'alt')); done(); });
+    }, 60);
+  });
+
+  step('T6-enter-default', function (done) {
+    var p = mk();
+    setTimeout(function () {
+      press('Enter');
+      p.then(function (v) { log('T6 enter-default-ok: ' + (v === true)); done(); });
+    }, 60);
+  });
+
+  step('T7-no-alt', function (done) {
+    var p = uiConfirm({ title: '普通确认' });
+    setTimeout(function () {
+      var d = document.querySelector('.modal-confirm');
+      log('T7 two-buttons-only: ' + (d.querySelectorAll('.form-actions .btn').length === 2));
+      d.querySelector('[data-act="ok"]').click();
+      p.then(function (v) { log('T7 resolves-true: ' + (v === true)); done(); });
+    }, 60);
+  });
+
+  step('T8-mask-cancel', function (done) {
+    var p = mk();
+    setTimeout(function () {
+      document.querySelector('.modal-confirm').parentNode.querySelector('.modal-mask').click();
+      p.then(function (v) { log('T8 mask-cancel-false: ' + (v === false)); done(); });
+    }, 60);
+  });
+
+  var i = 0;
+  function next() {
+    if (i >= steps.length) { log('ALL-DONE'); return; }
+    var s = steps[i++];
+    s.fn(function () { setTimeout(next, 260); });
+  }
+  setTimeout(next, 60);
+})();
+</script>
+</body>
+</html>

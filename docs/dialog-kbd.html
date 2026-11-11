@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>kbd</title>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+</head>
+<body>
+<pre id="r">running…</pre>
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+const out = [];
+const say = (s) => { out.push(s); document.getElementById('r').textContent = out.join('\n'); };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function press(key) {
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: key, bubbles: true, cancelable: true
+    }));
+}
+
+(async () => {
+    try {
+        // --- 1. Esc 取消（confirm 变体）---
+        const p1 = uiConfirm({ title: 'T1', note: 'n', okText: 'OK' });
+        await sleep(80);
+        const el1 = document.querySelector('.modal:not([hidden]) .modal-confirm');
+        say('T1 dialog-opened: ' + !!el1);
+        press('Escape');
+        const r1 = await p1;
+        say('T1 esc-returns-false: ' + (r1 === false));
+
+        await sleep(220);
+        say('T1 dom-removed: ' + (document.querySelectorAll('.modal').length === 0));
+
+        // --- 2. Enter 提交（confirm 变体）---
+        const p2 = uiConfirm({ title: 'T2', note: 'n', okText: 'OK' });
+        await sleep(80);
+        press('Enter');
+        const r2 = await p2;
+        say('T2 enter-returns-true: ' + (r2 === true));
+        await sleep(220);
+
+        // --- 3. Enter 提交（prompt 变体，返回输入值）---
+        const p3 = uiPrompt({ title: 'T3', label: 'L', value: '  空格包围  ', hint: '' });
+        await sleep(80);
+        press('Enter');
+        const r3 = await p3;
+        say('T3 enter-returns-trimmed: ' + JSON.stringify(r3));
+        await sleep(220);
+
+        // --- 4. prompt 空值被拦截 ---
+        const p4 = uiPrompt({ title: 'T4', label: 'L', value: '', hint: '提示' });
+        await sleep(80);
+        press('Enter');
+        await sleep(60);
+        const stillOpen = !!document.querySelector('.modal:not([hidden]) .modal-confirm');
+        const input = document.querySelector('.modal:not([hidden]) input');
+        const hintEl = document.querySelector('.modal:not([hidden]) .field-hint');
+        say('T4 empty-blocked-still-open: ' + stillOpen);
+        say('T4 input-has-invalid-class: ' + (input && input.classList.contains('invalid')));
+        say('T4 hint-shows-error: ' + (hintEl && hintEl.textContent));
+        press('Escape');
+        const r4 = await p4;
+        say('T4 esc-returns-null: ' + (r4 === null));
+        await sleep(220);
+
+        // --- 5. 自定义 validate 拦截 ---
+        const p5 = uiPrompt({
+            title: 'T5', label: 'L', value: 'a/b.pdf',
+            validate: (v) => (/[/]/.test(v) ? '不能有斜杠' : '')
+        });
+        await sleep(80);
+        press('Enter');
+        await sleep(60);
+        const h5 = document.querySelector('.modal:not([hidden]) .field-hint');
+        say('T5 validate-blocks: ' + (h5 && h5.textContent === '不能有斜杠'));
+        // 改成合法值再提交
+        const i5 = document.querySelector('.modal:not([hidden]) input');
+        i5.value = 'ok.pdf';
+        i5.dispatchEvent(new Event('input', { bubbles: true }));
+        press('Enter');
+        const r5 = await p5;
+        say('T5 valid-submits: ' + JSON.stringify(r5));
+        await sleep(220);
+
+        // --- 6. 点遮罩取消 ---
+        const p6 = uiConfirm({ title: 'T6', note: 'n' });
+        await sleep(80);
+        const mask = document.querySelector('.modal:not([hidden]) .modal-mask');
+        mask.click();
+        const r6 = await p6;
+        say('T6 mask-click-false: ' + (r6 === false));
+        await sleep(220);
+
+        // --- 7. 点关闭键取消 ---
+        const p7 = uiConfirm({ title: 'T7', note: 'n' });
+        await sleep(80);
+        document.querySelector('.modal:not([hidden]) .modal-close').click();
+        const r7 = await p7;
+        say('T7 close-btn-false: ' + (r7 === false));
+        await sleep(220);
+
+        // --- 8. 点取消按钮 ---
+        const p8 = uiConfirm({ title: 'T8', note: 'n' });
+        await sleep(80);
+        document.querySelector('.modal:not([hidden]) [data-act="cancel"].btn').click();
+        const r8 = await p8;
+        say('T8 cancel-btn-false: ' + (r8 === false));
+        await sleep(220);
+
+        // --- 9. danger 变体渲染红按钮 + 无 focus 环 ---
+        const p9 = uiConfirm({ title: 'T9', note: 'n', danger: true, okText: '删' });
+        await sleep(120);
+        const ok9 = document.querySelector('.modal:not([hidden]) .btn-danger');
+        const active9 = document.activeElement;
+        say('T9 danger-btn-rendered: ' + !!ok9);
+        say('T9 activeElement-is-container: ' + (active9 && active9.classList.contains('modal-confirm')));
+        press('Escape');
+        await p9;
+        await sleep(220);
+
+        // --- 10. XSS 转义 ---
+        const p10 = uiConfirm({ title: '<img src=x onerror=alert(1)>', sub: '<b>bold</b>', note: 'n' });
+        await sleep(100);
+        const titleEl = document.querySelector('.modal:not([hidden]) .modal-title');
+        say('T10 title-escaped: ' + (titleEl.textContent.indexOf('<img') === 0));
+        say('T10 no-img-injected: ' + (document.querySelectorAll('.modal:not([hidden]) img').length === 0));
+        press('Escape');
+        await p10;
+        await sleep(220);
+
+        // --- 11. 连续两个弹框不会互删 ---
+        const pA = uiConfirm({ title: 'A', note: 'n' });
+        await sleep(80);
+        const pB = uiConfirm({ title: 'B', note: 'n' });
+        await sleep(80);
+        const cnt2 = document.querySelectorAll('.modal').length;
+        say('T11 two-dialogs-coexist: ' + (cnt2 === 2));
+        // 关掉最上面的（B）
+        const modals = document.querySelectorAll('.modal');
+        modals[modals.length - 1].querySelector('.modal-mask').click();
+        const rB = await pB;
+        say('T11 last-closed-B: ' + (rB === false));
+        await sleep(220);
+        modals[0].querySelector('.modal-mask').click();
+        const rA = await pA;
+        say('T11 first-closed-A: ' + (rA === false));
+
+        say('ALL-DONE');
+    } catch (e) {
+        say('FATAL: ' + e.message);
+        say(e.stack || '');
+    }
+})();
+</script>
+</body>
+</html>

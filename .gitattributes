@@ -1,0 +1,2 @@
+# 构建脚本必须在 macOS / Linux 上用 LF，否则报 bad interpreter: /usr/bin/env bash^M
+*.sh text eol=lf

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>用户管理 · 云盘</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-view="list">
+
+<div class="shell">
+
+    <!-- ============ 左侧深色导航 ============ -->
+    <aside class="rail" id="rail">
+        <div class="rail-brand">
+            <span class="mark">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 19.2a4.3 4.3 0 0 1-.45-8.57 5.75 5.75 0 0 1 11.13-1.06 4.3 4.3 0 0 1-.28 9.63H6.6Z"/></svg>
+            </span>
+            <span class="rail-brand-t">
+                <strong>云盘</strong>
+                <em>Cloud Disk</em>
+            </span>
+        </div>
+
+        <div class="rail-scroll">
+            <div class="rail-group">
+                <div class="rail-label">管理</div>
+                <div class="rail-nav">
+                    <a class="chip" href="index.html">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.2A2.2 2.2 0 0 1 5.2 6h3.4l1.8 2h8.4A2.2 2.2 0 0 1 21 10.2v7.6A2.2 2.2 0 0 1 18.8 20H5.2A2.2 2.2 0 0 1 3 17.8V8.2Z"/></svg></span>
+                        <span class="chip-t">文件工作台</span>
+                    </a>
+                    <a class="chip active" href="admin.html">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5.6c0 4 3 7.5 7 8.9 4-1.4 7-4.9 7-8.9V6l-7-3Z"/><path d="M9.6 12.2 11 13.6l3.4-3.4"/></svg></span>
+                        <span class="chip-t">用户管理</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="rail-user" id="railUser" hidden>
+            <span class="u-ava" id="userAvatar">—</span>
+            <span class="u-meta">
+                <strong id="userName">—</strong>
+                <em id="userRole">—</em>
+            </span>
+            <button class="u-act" id="logoutBtn" type="button" title="退出登录" aria-label="退出登录">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"/><path d="m15 8.5 3.5 3.5L15 15.5"/><path d="M18.5 12H9"/></svg>
+            </button>
+        </div>
+
+        <div class="rail-foot">
+            <span class="kbd-hint"><kbd>/</kbd> 搜索　<kbd>Esc</kbd> 关闭弹窗</span>
+        </div>
+    </aside>
+
+    <div class="rail-mask" id="railMask"></div>
+
+    <!-- ============ 右侧工作区 ============ -->
+    <div class="workspace">
+
+        <header class="topbar">
+            <button class="rail-toggle" id="railToggle" type="button" aria-label="打开导航">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+
+            <nav class="crumb" aria-label="当前位置">
+                <span>云盘</span>
+                <span class="crumb-sep">/</span>
+                <span class="crumb-cur">用户管理</span>
+            </nav>
+
+            <div class="topbar-right">
+                <label class="search">
+                    <span class="search-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.9-3.9"/></svg></span>
+                    <input type="text" id="searchInput" placeholder="搜索用户名或显示名…" autocomplete="off" spellcheck="false">
+                </label>
+
+                <button class="btn btn-primary" id="addBtn" type="button">
+                    <span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+                    <span>新增用户</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="main admin-main">
+
+            <div class="page-head">
+                <h1>用户管理</h1>
+                <div class="stats">
+                    <div class="stat"><span class="stat-k">全部用户</span><span class="stat-v" id="statTotal">—</span></div>
+                    <div class="stat"><span class="stat-k">管理员</span><span class="stat-v" id="statAdmin">—</span></div>
+                    <div class="stat"><span class="stat-k">已禁用</span><span class="stat-v" id="statOff">—</span></div>
+                </div>
+            </div>
+
+            <p class="form-tip" style="margin:-6px 0 16px;">
+                系统不提供注册入口。所有可登录的账号都在这里创建；管理员账号由 application.yml 托管，密码以配置文件为准。
+            </p>
+
+            <div class="utable">
+                <div class="uhead">
+                    <span>用户</span>
+                    <span>角色 · 状态</span>
+                    <span>最后登录</span>
+                    <span class="lh-right" style="text-align:right;">操作</span>
+                </div>
+                <div id="uRows">
+                    <div class="utable-state">加载中…</div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ============ 新增 / 编辑用户 ============ -->
+<div class="modal" id="userModal" hidden>
+    <div class="modal-mask" data-close="userModal"></div>
+    <div class="modal-body modal-form">
+        <div class="m-head">
+            <p class="m-eyebrow">User</p>
+            <h3 class="modal-title" id="userModalTitle">新增用户</h3>
+            <p class="modal-sub" id="userModalSub">创建后即可用该账号登录云盘</p>
+            <button class="modal-close" type="button" data-close="userModal" aria-label="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+
+        <div class="m-body">
+            <div class="form-grid">
+                <div class="form-row2">
+                    <label class="field">
+                        <span class="field-label">用户名</span>
+                        <input id="fUsername" type="text" placeholder="登录名" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">显示名</span>
+                        <input id="fDisplayName" type="text" placeholder="姓名 / 昵称" autocomplete="off">
+                    </label>
+                </div>
+
+                <label class="field" id="fPwdField">
+                    <span class="field-label">初始密码</span>
+                    <span class="field-pwd">
+                        <input id="fPassword" type="password" placeholder="至少 6 位" autocomplete="new-password">
+                        <button class="pwd-eye" id="fPwdEye" type="button" aria-label="显示密码">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                        </button>
+                    </span>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">角色</span>
+                    <select id="fRole">
+                        <option value="USER">普通用户</option>
+                        <option value="ADMIN">管理员</option>
+                    </select>
+                </label>
+
+                <label class="switch-row">
+                    <input type="checkbox" id="fEnabled" checked>
+                    <span>允许登录</span>
+                </label>
+            </div>
+
+            <p class="form-error" id="userFormError" hidden></p>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-ghost" type="button" data-close="userModal">取消</button>
+            <button class="btn btn-primary" id="userSaveBtn" type="button">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 重置密码 ============ -->
+<div class="modal" id="pwdModal" hidden>
+    <div class="modal-mask" data-close="pwdModal"></div>
+    <div class="modal-body modal-form">
+        <div class="m-head">
+            <p class="m-eyebrow">Security</p>
+            <h3 class="modal-title">重置密码</h3>
+            <p class="modal-sub" id="pwdModalSub"></p>
+            <button class="modal-close" type="button" data-close="pwdModal" aria-label="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+
+        <div class="m-body">
+            <div class="form-grid">
+                <label class="field">
+                    <span class="field-label">新密码</span>
+                    <span class="field-pwd">
+                        <input id="pwdNew" type="password" placeholder="至少 6 位" autocomplete="new-password">
+                        <button class="pwd-eye" id="pwdNewEye" type="button" aria-label="显示密码">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                        </button>
+                    </span>
+                </label>
+            </div>
+
+            <p class="form-error" id="pwdError" hidden></p>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-ghost" type="button" data-close="pwdModal">取消</button>
+            <button class="btn btn-primary" id="pwdSaveBtn" type="button">确认重置</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/dialog.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

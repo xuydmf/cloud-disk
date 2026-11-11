@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>弹框改版 v0 · 新旧对比</title>
+<style>
+/* ============================================================
+   直接复制项目 style.css 的 :root token —— 保证同源
+   ============================================================ */
+:root {
+    --rail-bg-top: #101216;
+    --rail-bg-bottom: #0B0C0F;
+    --rail-surface: #16181D;
+    --rail-surface-2: #1E2027;
+    --rail-line: rgba(255, 255, 255, .07);
+    --rail-text: #ECEDEF;
+    --rail-text-2: #8E929B;
+    --rail-text-3: #5A5E67;
+
+    --canvas: #F7F7F9;
+    --surface: #FFFFFF;
+    --surface-2: #FBFBFC;
+    --line: #E7E8EC;
+    --line-strong: #D5D8DE;
+    --text: #14161A;
+    --text-2: #5B616B;
+    --text-3: #868D98;
+
+    --accent: #5B5BD6;
+    --accent-hover: #4E4EC6;
+    --accent-soft: rgba(91, 91, 214, .10);
+    --accent-line: rgba(91, 91, 214, .30);
+    --accent-on-dark: #A5A7FF;
+
+    --danger: #E5484D;
+    --danger-soft: rgba(229, 72, 77, .10);
+
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+
+    --sh-1: 0 1px 2px rgba(16, 18, 22, .05);
+    --sh-2: 0 2px 4px rgba(16, 18, 22, .05), 0 10px 22px -14px rgba(16, 18, 22, .22);
+    --sh-3: 0 2px 8px rgba(16, 18, 22, .08), 0 20px 48px -20px rgba(16, 18, 22, .34);
+
+    --ease: cubic-bezier(.22, 1, .36, 1);
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+            "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+            Menlo, Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    margin: 0;
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+    background: var(--canvas);
+    -webkit-font-smoothing: antialiased;
+}
+svg { display: block; }
+
+/* ============================================================
+   演示台（不属于交付内容）
+   ============================================================ */
+.stage {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 44px 28px 90px;
+}
+.stage-head { margin-bottom: 34px; }
+.stage-head h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    font-weight: 640;
+    letter-spacing: -.035em;
+}
+.stage-head p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-2);
+    max-width: 60ch;
+    text-wrap: pretty;
+}
+.stage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 22px;
+}
+.stage-col > .cap {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+}
+.stage-col > .cap b { color: var(--text); font-weight: 600; letter-spacing: .04em; }
+.stage-col > .cap .tag {
+    margin-left: auto;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-size: 9.5px;
+    letter-spacing: .06em;
+}
+.tag-old { background: rgba(229, 72, 77, .10); color: var(--danger); }
+.tag-new { background: var(--accent-soft); color: var(--accent); }
+
+/* 弹框的「静态快照」容器：把 modal 从 fixed 改成 relative，方便并排看 */
+.snapshot {
+    position: relative;
+    height: 470px;
+    border-radius: var(--r-lg);
+    background:
+        linear-gradient(135deg, #EDEEF2 0%, #E4E6EC 100%);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    border: 1px solid var(--line);
+}
+.snapshot.is-dark { background: #14161A; border-color: #26282F; }
+
+/* 在快照里禁用 fixed 定位 */
+.snapshot .modal {
+    position: absolute;
+    inset: 0;
+    padding: 18px;
+    animation: none;
+}
+.snapshot .modal-body { animation: none; }
+.snapshot .modal-mask { background: rgba(9, 10, 13, .46); }
+
+/* ============================================================
+   ⬛ OLD —— 完全复刻当前线上样式，作为对照
+   ============================================================ */
+.old .modal-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 10, 13, .68);
+    backdrop-filter: blur(5px);
+}
+.old .modal-body {
+    position: relative;
+    max-width: 92vw;
+    max-height: 88vh;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--sh-3);
+    overflow: hidden;
+}
+.old .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: var(--r-sm);
+    background: rgba(16, 18, 22, .055);
+    color: var(--text-3);
+    cursor: pointer;
+}
+.old .modal-close svg { width: 12px; height: 12px; }
+.old .modal-form { width: 100%; max-width: 360px; padding: 18px; }
+.old .modal-title {
+    margin: 0 0 2px;
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: -.015em;
+}
+.old .modal-sub {
+    margin: 0 0 13px;
+    padding-right: 28px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.old .form-grid { display: flex; flex-direction: column; margin-top: 14px; }
+.old .form-row2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+.old .field { display: block; margin-bottom: 14px; }
+.old .field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-2);
+}
+.old .field input,
+.old .field select {
+    width: 100%;
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: #fff;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+}
+.old .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+}
+.old .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 550;
+    cursor: pointer;
+}
+.old .btn-ghost { background: #fff; border-color: var(--line-strong); color: var(--text-2); }
+.old .btn-primary { background: var(--accent); color: #fff; }
+
+/* ============================================================
+   ⬜ NEW —— 改版样式
+   ============================================================ */
+.new .modal-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 10, 13, .58);
+    backdrop-filter: blur(6px) saturate(.92);
+    -webkit-backdrop-filter: blur(6px) saturate(.92);
+}
+
+/* 弹框本体：靠 outline 做 1px 亮边，比 border 更不容易被内层 overflow 裁掉 */
+.new .modal-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-width: 92vw;
+    max-height: 88vh;
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow:
+        0 0 0 1px rgba(16, 18, 22, .06),
+        0 4px 12px rgba(16, 18, 22, .07),
+        0 32px 64px -24px rgba(16, 18, 22, .40);
+    overflow: hidden;
+}
+
+/* ---- 头部：标题 + 副标题 + 关闭 ---- */
+.new .m-head {
+    position: relative;
+    flex: none;
+    padding: 20px 22px 0;
+}
+.new .m-eyebrow {
+    margin: 0 0 7px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+.new .modal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 620;
+    letter-spacing: -.025em;
+    line-height: 1.3;
+    color: var(--text);
+}
+.new .modal-sub {
+    margin: 5px 0 0;
+    padding-right: 34px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 关闭：幽灵圆钮，靠右上，任何底色都可见 */
+.new .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: background .14s var(--ease), color .14s var(--ease),
+                border-color .14s var(--ease);
+}
+.new .modal-close svg { width: 13px; height: 13px; }
+.new .modal-close:hover {
+    background: rgba(16, 18, 22, .06);
+    border-color: rgba(16, 18, 22, .06);
+    color: var(--text);
+}
+.new .modal-close:active { transform: scale(.94); }
+
+/* ---- 主体：可滚动 ---- */
+.new .m-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 22px 20px;
+}
+
+.new .form-grid { display: flex; flex-direction: column; }
+.new .form-row2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+.new .field { display: block; margin-bottom: 15px; }
+.new .field:last-child { margin-bottom: 0; }
+.new .field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11.5px;
+    font-weight: 550;
+    letter-spacing: .005em;
+    color: var(--text-2);
+}
+.new .field input,
+.new .field select {
+    width: 100%;
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .14s var(--ease), box-shadow .14s var(--ease);
+}
+.new .field input::placeholder { color: var(--text-3); }
+.new .field input:hover,
+.new .field select:hover { border-color: var(--line-strong); }
+.new .field input:focus,
+.new .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 开关 */
+.new .switch-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 3px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    cursor: pointer;
+}
+.new .switch-row input {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    width: 32px;
+    height: 18px;
+    margin: 0;
+    border-radius: 20px;
+    background: #D8DAE0;
+    cursor: pointer;
+    transition: background .15s var(--ease);
+}
+.new .switch-row input::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 18, 22, .28);
+    transition: transform .15s var(--ease);
+}
+.new .switch-row input:checked { background: var(--accent); }
+.new .switch-row input:checked::after { transform: translateX(14px); }
+
+/* ---- 底部：贴边分隔 + 右对齐按钮 ---- */
+.new .form-actions {
+    flex: none;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+}
+.new .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 35px;
+    padding: 0 15px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 550;
+    letter-spacing: -.005em;
+    cursor: pointer;
+    transition: background .14s var(--ease), border-color .14s var(--ease),
+                color .14s var(--ease), transform .1s var(--ease);
+}
+.new .btn-ghost {
+    background: var(--surface);
+    border-color: var(--line-strong);
+    color: var(--text-2);
+}
+.new .btn-ghost:hover {
+    background: #F1F2F5;
+    border-color: #C2C6CF;
+    color: var(--text);
+}
+.new .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(91, 91, 214, .30),
+                inset 0 1px 0 rgba(255, 255, 255, .14);
+}
+.new .btn-primary:hover { background: var(--accent-hover); }
+.new .btn:active { transform: translateY(.5px) scale(.99); }
+.new .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- 分组选择器（Picker 形态） ---- */
+.new .modal-panel { width: 384px; }
+.new .group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.new .group-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: background .13s var(--ease), border-color .13s var(--ease);
+}
+.new .group-item:hover {
+    background: var(--surface-2);
+    border-color: var(--line);
+}
+.new .group-item.on {
+    background: var(--accent-soft);
+    border-color: var(--accent-line);
+    color: var(--accent);
+    font-weight: 550;
+}
+.new .group-item .g-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+}
+
+/* ---- 媒体弹窗（图片 / 视频） ---- */
+.new .modal-media {
+    background: #0B0C0F;
+    line-height: 0;
+}
+.new .modal-media img,
+.new .modal-media video {
+    display: block;
+    max-width: 92vw;
+    max-height: 88vh;
+}
+.new .modal-media .modal-close {
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, .12);
+    border-color: rgba(255, 255, 255, .16);
+    color: #fff;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+.new .modal-media .modal-close:hover {
+    background: rgba(255, 255, 255, .24);
+    border-color: rgba(255, 255, 255, .3);
+}
+.new .m-cap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 11px 15px;
+    background: #0B0C0F;
+    border-top: 1px solid rgba(255, 255, 255, .07);
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: #F2F3F5;
+}
+.new .m-cap .m-cap-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.new .m-cap .m-cap-meta {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, .55);
+}
+
+/* 入场动画演示按钮 */
+.snap-actions {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+/* ---- 真实播放的弹框（点按钮触发） ---- */
+.modal-live {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+.modal-live[hidden] { display: none; }
+.modal-live .modal-mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 10, 13, .58);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: maskIn .22s var(--ease);
+}
+.modal-live .modal-body {
+    animation: modalIn .26s var(--ease);
+}
+@keyframes maskIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(10px) scale(.982); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (max-width: 760px) {
+    .stage { padding: 28px 16px 70px; }
+    .stage-head h1 { font-size: 21px; }
+    .snapshot { height: 430px; padding: 12px; }
+    .old .form-row2, .new .form-row2 { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .new .modal-body { border-radius: 14px; }
+    .new .m-head { padding: 18px 18px 0; }
+    .new .m-body { padding: 16px 18px 18px; }
+    .new .form-actions { padding: 13px 18px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+    <div class="stage-head">
+        <h1>弹框改版 · v0 对照</h1>
+        <p>左边是当前线上样式，右边是改版方案。所有颜色、圆角、阴影都取自项目现有 token（<code>--accent #5B5BD6</code> / <code>--r-*</code> / <code>--sh-*</code>），没有引入新色相。下方按钮可触发真实动画的弹框。</p>
+    </div>
+
+    <div class="stage-grid">
+
+        <!-- ============ 新旧对比：表单弹框 ============ -->
+        <div class="stage-col">
+            <p class="cap"><b>BEFORE</b> 表单弹框<span class="tag tag-old">线上现状</span></p>
+            <div class="snapshot old">
+                <div class="modal">
+                    <div class="modal-mask"></div>
+                    <div class="modal-body modal-form">
+                        <button class="modal-close" type="button" aria-label="关闭">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                        </button>
+                        <h3 class="modal-title">新增用户</h3>
+                        <p class="modal-sub">创建后即可用该账号登录云盘</p>
+                        <div class="form-grid">
+                            <div class="form-row2">
+                                <label class="field"><span class="field-label">用户名</span><input type="text" placeholder="登录名"></label>
+                                <label class="field"><span class="field-label">显示名</span><input type="text" placeholder="姓名 / 昵称"></label>
+                            </div>
+                            <label class="field"><span class="field-label">初始密码</span><input type="password" placeholder="至少 6 位"></label>
+                            <div class="form-actions">
+                                <button class="btn btn-ghost">取消</button>
+                                <button class="btn btn-primary">保存</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stage-col">
+            <p class="cap"><b>AFTER</b> 表单弹框<span class="tag tag-new">改版</span></p>
+            <div class="snapshot new">
+                <div class="modal">
+                    <div class="modal-mask"></div>
+                    <div class="modal-body modal-form">
+                        <div class="m-head">
+                            <p class="m-eyebrow">User</p>
+                            <h3 class="modal-title">新增用户</h3>
+                            <p class="modal-sub">创建后即可用该账号登录云盘</p>
+                            <button class="modal-close" type="button" aria-label="关闭">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                            </button>
+                        </div>
+                        <div class="m-body">
+                            <div class="form-grid">
+                                <div class="form-row2">
+                                    <label class="field"><span class="field-label">用户名</span><input type="text" placeholder="登录名"></label>
+                                    <label class="field"><span class="field-label">显示名</span><input type="text" placeholder="姓名 / 昵称"></label>
+                                </div>
+                                <label class="field"><span class="field-label">初始密码</span><input type="password" placeholder="至少 6 位"></label>
+                                <label class="switch-row"><input type="checkbox" checked><span>允许登录</span></label>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-ghost">取消</button>
+                            <button class="btn btn-primary">保存</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ 新旧对比：分组选择器 ============ -->
+        <div class="stage-col">
+            <p class="cap"><b>BEFORE</b> 分组选择器<span class="tag tag-old">线上现状</span></p>
+            <div class="snapshot old">
+                <div class="modal">
+                    <div class="modal-mask"></div>
+                    <div class="modal-body modal-form" style="width:300px;">
+                        <button class="modal-close" type="button" aria-label="关闭">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                        </button>
+                        <h3 class="modal-title">移动到分组</h3>
+                        <p class="modal-sub">IMG_7401.jpeg · 2.4 MB</p>
+                        <div style="display:flex;flex-direction:column;gap:4px;margin-top:12px;">
+                            <div style="padding:8px 11px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:12.5px;display:flex;justify-content:space-between;"><span>未分组</span><span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">12</span></div>
+                            <div style="padding:8px 11px;border:1px solid var(--accent-line);border-radius:var(--r-sm);background:var(--accent-soft);color:var(--accent);font-size:12.5px;display:flex;justify-content:space-between;"><span>设计稿</span><span style="font-family:var(--mono);font-size:10px">8</span></div>
+                            <div style="padding:8px 11px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:12.5px;display:flex;justify-content:space-between;"><span>合同文档</span><span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">3</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stage-col">
+            <p class="cap"><b>AFTER</b> 分组选择器<span class="tag tag-new">改版</span></p>
+            <div class="snapshot new">
+                <div class="modal">
+                    <div class="modal-mask"></div>
+                    <div class="modal-body modal-panel">
+                        <div class="m-head">
+                            <p class="m-eyebrow">Move to</p>
+                            <h3 class="modal-title">移动到分组</h3>
+                            <p class="modal-sub">IMG_7401.jpeg · 2.4 MB</p>
+                            <button class="modal-close" type="button" aria-label="关闭">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                            </button>
+                        </div>
+                        <div class="m-body">
+                            <div class="group-list">
+                                <button class="group-item"><span>未分组</span><span class="g-count">12</span></button>
+                                <button class="group-item on"><span>设计稿</span><span class="g-count">8</span></button>
+                                <button class="group-item"><span>合同文档</span><span class="g-count">3</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ 真实动画触发区 ============ -->
+    <div class="stage-head" style="margin:44px 0 16px;">
+        <h1 style="font-size:18px;">真实动画</h1>
+        <p>点击按钮看入场动效（<code>translateY(10px) + scale(.982)</code>，260ms，与遮罩 220ms 错峰）。按 Esc 或点遮罩关闭。</p>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary new" style="height:38px;padding:0 18px;font-size:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-md);cursor:pointer;font-family:inherit;font-weight:550;" onclick="openLive('form')">打开表单弹框</button>
+        <button class="btn" style="height:38px;padding:0 18px;font-size:13px;background:#fff;color:var(--text-2);border:1px solid var(--line-strong);border-radius:var(--r-md);cursor:pointer;font-family:inherit;font-weight:550;" onclick="openLive('media')">打开图片弹框</button>
+    </div>
+</div>
+
+<!-- 真实可交互弹框：表单 -->
+<div class="modal-live new" id="liveForm" hidden>
+    <div class="modal-mask" onclick="closeLive('liveForm')"></div>
+    <div class="modal-body modal-form" style="width:420px;max-width:92vw;">
+        <div class="m-head">
+            <p class="m-eyebrow">User</p>
+            <h3 class="modal-title">新增用户</h3>
+            <p class="modal-sub">创建后即可用该账号登录云盘</p>
+            <button class="modal-close" type="button" aria-label="关闭" onclick="closeLive('liveForm')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+        <div class="m-body">
+            <div class="form-grid">
+                <div class="form-row2">
+                    <label class="field"><span class="field-label">用户名</span><input type="text" placeholder="登录名"></label>
+                    <label class="field"><span class="field-label">显示名</span><input type="text" placeholder="姓名 / 昵称"></label>
+                </div>
+                <label class="field"><span class="field-label">初始密码</span><input type="password" placeholder="至少 6 位"></label>
+                <label class="field"><span class="field-label">角色</span>
+                    <select><option>普通用户</option><option>管理员</option></select>
+                </label>
+                <label class="switch-row"><input type="checkbox" checked><span>允许登录</span></label>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-ghost" onclick="closeLive('liveForm')">取消</button>
+            <button class="btn btn-primary" onclick="closeLive('liveForm')">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 真实可交互弹框：图片 -->
+<div class="modal-live new" id="liveMedia" hidden>
+    <div class="modal-mask" onclick="closeLive('liveMedia')"></div>
+    <div class="modal-body modal-media" style="width:520px;">
+        <button class="modal-close" type="button" aria-label="关闭" onclick="closeLive('liveMedia')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+        <div style="aspect-ratio:16/10;display:grid;place-items:center;background:linear-gradient(135deg,#22242B,#16181D);color:#5A5E67;font-family:var(--mono);font-size:11px;letter-spacing:.1em;">16:10 IMAGE PLACEHOLDER</div>
+        <div class="m-cap">
+            <span class="m-cap-name">IMG_7401.jpeg</span>
+            <span class="m-cap-meta">3 / 12</span>
+        </div>
+    </div>
+</div>
+
+<script>
+function openLive(id) {
+    document.getElementById(id === 'form' ? 'liveForm' : 'liveMedia').hidden = false;
+}
+function closeLive(id) {
+    document.getElementById(id).hidden = true;
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeLive('liveForm');
+        closeLive('liveMedia');
+    }
+});
+</script>
+</body>
+</html>

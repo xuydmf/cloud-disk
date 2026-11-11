@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>相册选择器耗时测试</title>
+<style>
+    body { font: 16px/1.6 -apple-system, "PingFang SC", sans-serif; margin: 0; padding: 20px 18px 40px;
+           color: #111; background: #fff; -webkit-text-size-adjust: 100%; }
+    h1 { font-size: 17px; margin: 0 0 4px; }
+    p.sub { margin: 0 0 18px; color: #555; font-size: 13.5px; }
+    .card { border: 1px solid #d2d2d7; border-radius: 12px; padding: 13px 14px; margin-bottom: 12px; }
+    .card h2 { font-size: 14.5px; margin: 0 0 2px; }
+    .card .note { margin: 0 0 10px; color: #6e6e73; font-size: 12.5px; }
+    .card code { background: #f5f5f7; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+    button { display: block; width: 100%; padding: 14px; font-size: 16px; font-weight: 600;
+             color: #fff; background: #0071e3; border: 0; border-radius: 10px; }
+    button:disabled { background: #d2d2d7; color: #6e6e73; }
+    .out { margin-top: 10px; font: 12.5px/1.7 ui-monospace, Menlo, monospace; white-space: pre-wrap;
+           color: #333; min-height: 18px; }
+    .big { color: #b25000; font-weight: 700; }
+    .tip { margin-top: 18px; padding: 12px 14px; background: #f5f5f7; border-radius: 10px;
+           font-size: 12.5px; line-height: 1.7; color: #444; }
+</style>
+</head>
+<body>
+<h1>相册选择器 · 到底慢在哪</h1>
+<p class="sub">三个按钮依次点，每个都等它自己跳回本页。页面不读文件内容、不上传，只记时间。数字同时发回服务器日志（<code>[picker]</code>），不用手抄。</p>
+
+<div id="cards"></div>
+
+<div class="tip">
+    <b>怎么看结果</b><br>
+    ① 同一个按钮先选 <b>1 张</b>，再选 <b>20 张</b>：两者之差 ÷ 19 就是<i>系统每张照片的导出成本</i>。<br>
+    ② 看<i>交付类型</i>：如果相册里是 HEIC，但交付的是 <code>image/jpeg</code> + <code>.JPG</code>，说明 iOS 在<br>
+    　 「完成」那一刻做了 HEIC→JPEG 转码——那是每张几百毫秒的大头，且发生在网页拿到文件之前。<br>
+    ③ 三个变体里如果哪个明显更快、且交付类型不同，就照它改上传页的 <code>accept</code>。
+</div>
+
+<script>
+(function () {
+    /**
+     * 三个变体，唯一差别是 accept。
+     * 背景：WebKit 直到 2024-03 才改成「accept 没被限制且包含 HEIC 时不转码」
+     *（Bug 267277）。老系统上 HEIC 是无条件转 JPEG 的，转码就是「点完完成要等很久」的主因。
+     */
+    var VARIANTS = [
+        { id: 'app', label: 'A · 上传页当前写法', accept: 'image/*,video/*',
+          note: '通配符，不限制具体类型' },
+        { id: 'any', label: 'B · 完全不写 accept', accept: '',
+          note: '让浏览器自己决定给什么' },
+        { id: 'heic', label: 'C · 显式列出（含 HEIC）', accept: 'image/jpeg,image/png,image/heic,image/heif,video/quicktime,video/mp4',
+          note: '类型受限但包含 HEIC，按 WebKit 的逻辑不应触发转码' }
+    ];
+
+    // 心跳：iOS 弹相册时页面「以为」自己在前台（不发 visibilitychange），
+    // 所以用定时器间隔的抖动判断主线程有没有被冻住。正常 100ms 一次。
+    var lastTick = performance.now();
+    var maxGap = 0;
+    setInterval(function () {
+        var n = performance.now();
+        var g = n - lastTick;
+        if (g > maxGap) maxGap = g;
+        lastTick = n;
+    }, 100);
+
+    var cards = document.getElementById('cards');
+
+    VARIANTS.forEach(function (v) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = '<h2>' + v.label + '</h2>'
+            + '<p class="note">' + (v.accept ? '<code>accept="' + v.accept + '"</code><br>' : '<code>无 accept</code><br>')
+            + v.note + '</p>'
+            + '<button type="button" id="btn_' + v.id + '">选照片</button>'
+            + '<div class="out" id="out_' + v.id + '">未测试</div>';
+        cards.appendChild(card);
+
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        if (v.accept) input.accept = v.accept;
+        input.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+        document.body.appendChild(input);
+
+        var btn = card.querySelector('button');
+        var out = card.querySelector('.out');
+        var t0 = 0;
+
+        function report(kind, files) {
+            var total = performance.now() - t0;
+            var n = files ? files.length : 0;
+            var bytes = 0;
+            var types = {};
+            for (var i = 0; i < n; i++) {
+                bytes += files[i].size;
+                var t = (files[i].type || '未知') + ' / ' + ((files[i].name || '').split('.').pop() || '?');
+                types[t] = (types[t] || 0) + 1;
+            }
+            var typeText = Object.keys(types).map(function (k) { return k + ' ×' + types[k]; }).join('，') || '—';
+            // 「固定开销」= 点开相册 → change 这一段与张数无关的部分（呈现 + 关闭 + 第一张导出）。
+            // 基准存进 localStorage：先测 1 张、后测 20 张，或者反过来，算出来的每张成本都对。
+            var base = Number(localStorage.getItem('picker_base_' + v.id) || 0);
+            var per = n > 0 ? Math.round(Math.max(0, total - base) / n) : 0;
+            var perNote = base > 0
+                ? '（已扣除 ' + Math.round(base) + ' ms 固定开销）'
+                : '（含固定开销；先测一次「1 张」更准）';
+
+            out.innerHTML = '【' + kind + '】<b class="big">' + Math.round(total) + ' ms</b>'
+                + '　主线程最长停顿 ' + Math.round(maxGap) + ' ms\n'
+                + '文件 ' + n + ' 个，' + (bytes / 1048576).toFixed(1) + ' MB\n'
+                + '每张约 ' + per + ' ms ' + perNote + '\n'
+                + '交付类型：' + typeText;
+
+            // 1 张那次的结果当「固定开销」，之后每张成本都按 (总 - 固定) / 张数 算
+            if (n === 1) {
+                base = total;
+                try { localStorage.setItem('picker_base_' + v.id, String(Math.round(total))); } catch (e) { /* 隐私模式 */ }
+            }
+
+            var payload = 'test=' + v.id
+                + ' event=' + kind
+                + ' files=' + n
+                + ' mb=' + (bytes / 1048576).toFixed(1)
+                + ' total=' + Math.round(total)
+                + ' perFile=' + per
+                + ' base=' + Math.round(base)
+                + ' maxGap=' + Math.round(maxGap)
+                + ' types=' + typeText.replace(/[，/ ]/g, '_')
+                + ' ua=' + navigator.userAgent.substring(0, 120);
+            fetch('/api/debug/picker', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: payload })
+                .catch(function () {});
+        }
+
+        btn.onclick = function () {
+            t0 = performance.now();
+            maxGap = 0;
+            lastTick = performance.now();
+            out.textContent = '已点开相册，请选照片后点「完成」…';
+            input.value = '';
+            input.click();
+        };
+
+        input.onchange = function () {
+            var f = input.files;
+            if (!f || !f.length) { out.textContent = '没有拿到文件（可能是空选择）'; return; }
+            report('change', f);
+            // 不在这里清空：清空会同步释放文件句柄，可能把上面那次统计也弄脏
+        };
+
+        // Safari 16.4+：点取消也会发 cancel，正好用来量「只开不选」的固定开销
+        input.addEventListener('cancel', function () {
+            report('cancel', null);
+        });
+    });
+})();
+</script>
+</body>
+</html>

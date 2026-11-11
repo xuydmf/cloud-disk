@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>云盘 · 文件工作台</title>
+<link rel="stylesheet" href="css/style.css?v=20261110a">
+</head>
+<body data-view="grid">
+
+<div class="shell">
+
+    <!-- ============ 左侧深色导航 ============ -->
+    <aside class="rail" id="rail">
+        <div class="rail-brand">
+            <span class="mark">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 19.2a4.3 4.3 0 0 1-.45-8.57 5.75 5.75 0 0 1 11.13-1.06 4.3 4.3 0 0 1-.28 9.63H6.6Z"/></svg>
+            </span>
+            <span class="rail-brand-t">
+                <strong>云盘</strong>
+                <em>Cloud Disk</em>
+            </span>
+        </div>
+
+        <div class="rail-scroll">
+            <div class="rail-group">
+                <div class="rail-label">库</div>
+                <div class="rail-nav" id="filters">
+                    <button class="chip active" type="button" data-type="">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+                        <span class="chip-t">全部文件</span>
+                    </button>
+                    <button class="chip" type="button" data-type="IMAGE">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m21 16-4.6-4.6L7 21"/></svg></span>
+                        <span class="chip-t">图片</span>
+                    </button>
+                    <button class="chip" type="button" data-type="VIDEO">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="m15.5 11 5.5-3v8l-5.5-3"/></svg></span>
+                        <span class="chip-t">视频</span>
+                    </button>
+                    <button class="chip" type="button" data-type="OTHER">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5L13.5 3Z"/><path d="M13.5 3v5.5H19"/></svg></span>
+                        <span class="chip-t">其他</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="rail-group">
+                <div class="rail-label">分组</div>
+                <div class="groups-bar" id="groupsBar"></div>
+            </div>
+
+            <div class="rail-group">
+                <div class="rail-label">其他</div>
+                <div class="rail-nav">
+                    <a class="chip" href="recycle.html">
+                        <span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16"/><path d="M9 6.5V4.4h6v2.1"/><path d="M6.4 6.5 7.3 20h9.4l.9-13.5"/><path d="M10 10.5v6M14 10.5v6"/></svg></span>
+                        <span class="chip-t">回收站</span>
+                        <span class="chip-badge" id="recycleBadge" hidden>0</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="rail-user" id="railUser" hidden>
+            <span class="u-ava" id="userAvatar">—</span>
+            <span class="u-meta">
+                <strong id="userName">—</strong>
+                <em id="userRole">—</em>
+            </span>
+            <a class="u-act" id="adminLink" href="admin.html" title="用户管理" aria-label="用户管理" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5.6c0 4 3 7.5 7 8.9 4-1.4 7-4.9 7-8.9V6l-7-3Z"/><path d="M9.6 12.2 11 13.6l3.4-3.4"/></svg>
+            </a>
+            <button class="u-act" id="logoutBtn" type="button" title="退出登录" aria-label="退出登录">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"/><path d="m15 8.5 3.5 3.5L15 15.5"/><path d="M18.5 12H9"/></svg>
+            </button>
+        </div>
+
+        <div class="rail-foot">
+            <span class="kbd-hint"><kbd>/</kbd> 聚焦搜索　<kbd>Esc</kbd> 关闭</span>
+        </div>
+    </aside>
+
+    <div class="rail-mask" id="railMask"></div>
+
+    <!-- ============ 右侧工作区 ============ -->
+    <div class="workspace">
+
+        <header class="topbar">
+            <button class="rail-toggle" id="railToggle" type="button" aria-label="打开导航">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+
+            <nav class="crumb" aria-label="当前位置">
+                <span>云盘</span>
+                <span class="crumb-sep">/</span>
+                <span class="crumb-cur" id="crumbName">全部文件</span>
+            </nav>
+
+            <div class="topbar-right">
+                <label class="search">
+                    <span class="search-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.9-3.9"/></svg></span>
+                    <input type="text" id="searchInput" placeholder="搜索文件名…" autocomplete="off" spellcheck="false">
+                </label>
+
+                <div class="seg" role="group" aria-label="视图切换">
+                    <button class="seg-btn active" id="viewGrid" type="button" title="网格视图" aria-label="网格视图">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
+                    </button>
+                    <button class="seg-btn" id="viewList" type="button" title="列表视图" aria-label="列表视图">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+                    </button>
+                </div>
+
+                <button class="btn" id="pickMediaBtn" type="button" style="display:none" title="从相册选择照片或视频">
+                    <span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.6" cy="9.6" r="1.6"/><path d="m4 17 4.8-4.4L13 16l3.2-2.8L20 17"/></svg></span>
+                    <span>照片/视频</span>
+                </button>
+                <button class="btn btn-primary" id="pickBtn" type="button">
+                    <span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V5"/><path d="m7.5 9.5 4.5-4.5 4.5 4.5"/><path d="M4.5 20h15"/></svg></span>
+                    <span>上传文件</span>
+                </button>
+                <!-- 两个 file input 放在 body 末尾，不放在这个工具栏里：
+                     iOS 从系统选择器返回时要重绘当前可视区域，元素若挂在 sticky + 模糊的
+                     顶栏子树里，会连它的合成层一起重算。挪出去只为少一层牵挂。 -->
+            </div>
+        </header>
+
+        <main class="main">
+
+            <div class="page-head">
+                <h1 id="viewTitle">全部文件</h1>
+                <div class="stats">
+                    <div class="stat"><span class="stat-k">文件</span><span class="stat-v" id="statTotal">—</span></div>
+                    <div class="stat"><span class="stat-k">本页</span><span class="stat-v" id="statPage">—</span></div>
+                    <div class="stat"><span class="stat-k">分组</span><span class="stat-v" id="statGroups">—</span></div>
+                </div>
+            </div>
+
+            <!-- 拖拽上传 -->
+            <div class="dropzone" id="dropzone">
+                <div class="dz-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M4 15v2.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V15"/></svg>
+                </div>
+                <div class="dz-text">
+                    <p class="dz-title">拖拽文件到此处批量上传，或点击选择</p>
+                    <p class="dz-hint">JPG · PNG · HEIC · WEBP · MOV · MP4 · 及任意格式　|　大图自动压到 2560px，逐张并发上传，单张失败自动重试；超过 8 MB 走分片，中断可续传</p>
+                    <button class="dz-opt" id="origToggle" type="button" aria-pressed="false">大图自动压缩后再传 · 点此改为上传原图</button>
+                </div>
+                <span class="dz-cta">选择文件</span>
+            </div>
+
+            <!-- 上传进度：上面是进度条，下面是「已完成张数 · 字节 · 速度 · 剩余时间」 -->
+            <div class="upload-progress" id="uploadProgress" hidden>
+                <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+                <div class="up-meta">
+                    <span id="progressText">上传中…</span>
+                    <span id="progressSpeed"></span>
+                </div>
+            </div>
+
+            <!-- 日期条：按拍摄日期把已上传的照片分组，一眼看出「哪天传了多少」。
+                 手机上是横向滚动的一排小胶囊，点一下只看那天。 -->
+            <div class="daybar" id="dayBar" hidden></div>
+
+            <!-- 列表视图表头 -->
+            <div class="list-head">
+                <span></span>
+                <span></span>
+                <span>名称</span>
+                <span>大小 · 上传时间</span>
+                <span class="lh-right">操作</span>
+            </div>
+
+            <!-- 文件区 -->
+            <div class="grid" id="grid"></div>
+
+            <div class="empty" id="empty" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h3.2l1.8 2h8A2.5 2.5 0 0 1 21 10.5v7A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-9Z"/></svg>
+                <p>这里还没有文件</p>
+                <small>拖拽或点击上方区域开始上传</small>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </main>
+    </div>
+</div>
+
+<!-- ============ 批量操作条 ============ -->
+<div class="batch-bar" id="batchBar" hidden>
+    <span class="batch-count"><b id="batchCount">0</b>项已选</span>
+    <span class="batch-sep"></span>
+    <button class="batch-btn" id="batchAll" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 12 4.5 4.5L16 8"/><path d="m11 16.5 1 1L21.5 7.5"/></svg>
+        <span>全选本页</span>
+    </button>
+    <button class="batch-btn" id="batchGroup" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.2A2.2 2.2 0 0 1 5.2 6h3.4l1.8 2h8.4A2.2 2.2 0 0 1 21 10.2v7.6A2.2 2.2 0 0 1 18.8 20H5.2A2.2 2.2 0 0 1 3 17.8V8.2Z"/></svg>
+        <span>移动到分组</span>
+    </button>
+    <button class="batch-btn" id="batchDownload" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4.5 20h15"/></svg>
+        <span>下载</span>
+    </button>
+    <button class="batch-btn danger" id="batchDelete" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16"/><path d="M9 6.5V4.4h6v2.1"/><path d="M6.4 6.5 7.3 20h9.4l.9-13.5"/></svg>
+        <span>删除</span>
+    </button>
+    <span class="batch-sep"></span>
+    <button class="batch-close" id="batchClear" type="button" title="取消选择" aria-label="取消选择">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+</div>
+
+<!-- ============ 图片预览 ============ -->
+<div class="modal" id="imageModal" hidden>
+    <div class="modal-mask" data-close="imageModal"></div>
+
+    <button class="gallery-nav prev" id="imgPrev" type="button" aria-label="上一张" title="上一张（←）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7"/></svg>
+    </button>
+    <button class="gallery-nav next" id="imgNext" type="button" aria-label="下一张" title="下一张（→）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 5 7 7-7 7"/></svg>
+    </button>
+
+    <div class="modal-body modal-media gallery-stage" id="galleryStage">
+        <button class="modal-close" type="button" data-close="imageModal" aria-label="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+        <!-- 两层叠着放：下一张先解到隐藏层，解码完再切上来，换图时不会出现空帧和重排 -->
+        <img id="imagePreview" class="gal-layer" alt="预览">
+        <img id="imagePreviewB" class="gal-layer" alt="" hidden>
+        <div class="media-state" id="imgState" hidden>
+            <span class="ring"></span>
+            <span id="imgStateText">正在载入…</span>
+        </div>
+        <div class="gallery-cap">
+            <span class="gallery-name" id="imgName"></span>
+            <span class="gallery-count" id="imgCount"></span>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 视频播放 ============ -->
+<div class="modal" id="videoModal" hidden>
+    <div class="modal-mask" data-close="videoModal"></div>
+    <div class="modal-body modal-media modal-video">
+        <button class="modal-close" type="button" data-close="videoModal" aria-label="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+        <video id="videoPlayer" controls autoplay playsinline></video>
+        <div class="media-state" id="videoState" data-mode="error" hidden>
+            <span class="ring"></span>
+            <span id="videoStateText">这个视频浏览器播不了</span>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 移动到分组 ============ -->
+<div class="modal" id="groupModal" hidden>
+    <div class="modal-mask" data-close="groupModal"></div>
+    <div class="modal-body modal-panel">
+        <div class="m-head">
+            <p class="m-eyebrow">Move to</p>
+            <h3 class="modal-title">移动到分组</h3>
+            <p class="modal-sub" id="groupModalFile"></p>
+            <button class="modal-close" type="button" data-close="groupModal" aria-label="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+        <div class="m-body">
+            <div class="group-list" id="groupModalList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 上传前确认：按日期分组列一遍 ============ -->
+<div class="modal" id="uploadSheet" hidden>
+    <div class="modal-mask" data-close="uploadSheet"></div>
+    <div class="modal-body modal-panel modal-sheet">
+        <div class="m-head">
+            <p class="m-eyebrow">Upload</p>
+            <h3 class="modal-title" id="sheetTitle">本次选择</h3>
+            <p class="modal-sub" id="sheetSub"></p>
+            <button class="modal-close" type="button" data-close="uploadSheet" aria-label="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+        <div class="m-body">
+            <div class="sheet-list" id="sheetList"></div>
+        </div>
+        <div class="sheet-foot">
+            <button class="btn" id="sheetCancel" type="button">取消</button>
+            <button class="btn btn-primary" id="sheetStart" type="button">开始上传</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<!-- 隐藏的文件选择控件。不用 hidden / display:none：那样在部分 WebView 里点不动。
+     用 CSS 移出视口，iOS 点开时也不会引起页面重排。 -->
+<input type="file" id="fileInput" multiple
+       style="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
+<!-- 相册专用：带上 accept 后 iOS 走系统媒体选择器（PHPicker）、安卓直接进相册，
+     比「文件浏览」那条路快得多，也不会被当成任意文件逐个查元数据。 -->
+<input type="file" id="mediaInput" multiple accept="image/*,video/*"
+       style="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
+
+<script src="js/edit-types.js"></script>
+<script src="js/dialog.js"></script>
+<script src="js/native.js?v=20261110b"></script>
+<script src="js/app.js?v=20261110b"></script>
+</body>
+</html>

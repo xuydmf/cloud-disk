@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>dialog.js 冒烟</title>
+<style>
+  body { font: 14px/1.6 system-ui, sans-serif; padding: 24px; background: #FBFBFC; color: #16181C; }
+  pre { background: #fff; border: 1px solid #E6E7EB; border-radius: 10px; padding: 14px; font-size: 12.5px; }
+  .ok { color: #1F8A52; } .bad { color: #E5484D; }
+</style>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+</head>
+<body>
+<h3>dialog.js 运行时冒烟</h3>
+<pre id="r">running...</pre>
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+(function () {
+  var lines = [];
+  function log(k, v) {
+    lines.push(k + ': ' + v);
+    document.getElementById('r').textContent = lines.join('\n');
+  }
+  log('typeof uiConfirm', typeof window.uiConfirm);
+  log('typeof uiPrompt', typeof window.uiPrompt);
+
+  // 打开一个真实弹框，验证能被构建、有全部关键节点、样式生效
+  window.uiConfirm({
+    icon: 'trash', eyebrow: 'Delete', title: '删除此文件？',
+    sub: '季度报告.pdf', note: '文件会移入<strong>回收站</strong>，7 天内可随时恢复。',
+    okText: '移入回收站'
+  });
+
+  setTimeout(function () {
+    var el = document.querySelector('.modal-confirm');
+    log('dialog-built', !!el);
+    if (!el) { log('RESULT', 'FAIL'); return; }
+    log('has-m-head', !!el.querySelector('.m-head'));
+    log('has-m-body', !!el.querySelector('.m-body'));
+    log('has-form-actions', !!el.querySelector('.form-actions'));
+    log('has-m-icon', !!el.querySelector('.m-icon'));
+    log('has-m-note', !!el.querySelector('.m-note'));
+    log('ok-text', (el.querySelector('[data-act="ok"]') || {}).textContent);
+    log('note-html-bold', !!el.querySelector('.m-note strong'));
+    var cs = getComputedStyle(el);
+    log('width-px', cs.width);
+    log('radius', cs.borderRadius);
+    log('js-errors', window.__errs === undefined ? 0 : window.__errs);
+    log('RESULT', 'DONE');
+  }, 400);
+})();
+window.addEventListener('error', function () { window.__errs = (window.__errs || 0) + 1; });
+</script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>确认弹框规格 · v0</title>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+<style>
+    body { background: #DFE1E7; margin: 0; }
+    .qa-wrap { padding: 26px; }
+
+    .qa-title {
+        margin: 0 0 4px;
+        font-size: 20px;
+        font-weight: 640;
+        letter-spacing: -.03em;
+        color: #14161A;
+    }
+    .qa-desc {
+        margin: 0 0 22px;
+        font-size: 12.5px;
+        color: #5B616B;
+        max-width: 70ch;
+        text-wrap: pretty;
+    }
+
+    .qa-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+    .qa-cell {
+        position: relative;
+        height: 452px;
+        border-radius: 12px;
+        background: #E9EAEF;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+    }
+    .qa-cell > .lbl {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        z-index: 20;
+        font-family: var(--mono);
+        font-size: 9.5px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: #868D98;
+    }
+    .qa-cell .modal {
+        position: absolute;
+        inset: 0;
+        padding: 20px;
+        display: grid;
+        place-items: center;
+    }
+    .qa-cell .modal[hidden] { display: grid; }
+    .qa-cell .modal-mask { animation: none; }
+    .qa-cell .modal-body { animation: none; }
+
+    @media (max-width: 900px) {
+        .qa-grid { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qa-wrap">
+    <h1 class="qa-title">确认弹框 · 三变体规格</h1>
+    <p class="qa-desc">替换系统中 13 处原生 <code>confirm()</code> / <code>prompt()</code>。三变体共用同一骨架（图标 + 标题 + 说明 + 底栏），仅危险级与输入型有差异。</p>
+
+    <div class="qa-grid">
+
+        <!-- ========== 1. danger：彻底删除 ========== -->
+        <div class="qa-cell">
+            <span class="lbl">1 / danger · 彻底删除</span>
+            <div class="modal">
+                <div class="modal-mask"></div>
+                <div class="modal-body modal-confirm">
+                    <div class="m-head">
+                        <span class="m-icon danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.2 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4L17.8 7"/><path d="M10.4 11v5.4M13.6 11v5.4"/></svg>
+                        </span>
+                        <p class="m-eyebrow">Danger</p>
+                        <h3 class="modal-title">彻底删除此文件？</h3>
+                        <p class="modal-sub">IMG_7401.jpeg · 2.4 MB</p>
+                    </div>
+                    <div class="m-body">
+                        <div class="m-note danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8.5v4.2"/><circle cx="12" cy="16.4" r=".1" fill="currentColor" stroke-width="2.4"/><path d="M12 3.6 2.8 19.4a1 1 0 0 0 .9 1.5h16.6a1 1 0 0 0 .9-1.5L12 3.6Z"/></svg>
+                            <span>此操作<strong>不可撤销</strong>，文件将被永久从磁盘移除，回收站中不再保留。</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-ghost" type="button">取消</button>
+                        <button class="btn btn-danger" type="button">彻底删除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 2. danger：清空回收站 ========== -->
+        <div class="qa-cell">
+            <span class="lbl">2 / danger · 清空回收站</span>
+            <div class="modal">
+                <div class="modal-mask"></div>
+                <div class="modal-body modal-confirm">
+                    <div class="m-head">
+                        <span class="m-icon danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.2 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4L17.8 7"/></svg>
+                        </span>
+                        <p class="m-eyebrow">Danger</p>
+                        <h3 class="modal-title">清空回收站？</h3>
+                        <p class="modal-sub">共 37 个文件 · 占用 1.8 GB</p>
+                    </div>
+                    <div class="m-body">
+                        <div class="m-note danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8.5v4.2"/><circle cx="12" cy="16.4" r=".1" fill="currentColor" stroke-width="2.4"/><path d="M12 3.6 2.8 19.4a1 1 0 0 0 .9 1.5h16.6a1 1 0 0 0 .9-1.5L12 3.6Z"/></svg>
+                            <span>回收站内<strong>全部 37 个文件</strong>将被永久删除，且无法恢复。</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-ghost" type="button">取消</button>
+                        <button class="btn btn-danger" type="button">清空回收站</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 3. confirm：普通删除（软删除） ========== -->
+        <div class="qa-cell">
+            <span class="lbl">3 / confirm · 移入回收站</span>
+            <div class="modal">
+                <div class="modal-mask"></div>
+                <div class="modal-body modal-confirm">
+                    <div class="m-head">
+                        <span class="m-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.2 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4L17.8 7"/><path d="M10.4 11v5.4M13.6 11v5.4"/></svg>
+                        </span>
+                        <p class="m-eyebrow">Delete</p>
+                        <h3 class="modal-title">删除此文件？</h3>
+                        <p class="modal-sub">IMG_7401.jpeg · 2.4 MB</p>
+                    </div>
+                    <div class="m-body">
+                        <div class="m-note">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 11.4v5"/><circle cx="12" cy="7.9" r=".1" fill="currentColor" stroke-width="2.4"/></svg>
+                            <span>文件会移入<strong>回收站</strong>，7 天内可随时恢复。</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-ghost" type="button">取消</button>
+                        <button class="btn btn-primary" type="button">移入回收站</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 4. confirm：批量（带数量强调） ========== -->
+        <div class="qa-cell">
+            <span class="lbl">4 / confirm · 批量操作</span>
+            <div class="modal">
+                <div class="modal-mask"></div>
+                <div class="modal-body modal-confirm">
+                    <div class="m-head">
+                        <span class="m-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.2 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4L17.8 7"/></svg>
+                        </span>
+                        <p class="m-eyebrow">Delete · 8 items</p>
+                        <h3 class="modal-title">删除选中的 8 个文件？</h3>
+                        <p class="modal-sub">合计 42.6 MB</p>
+                    </div>
+                    <div class="m-body">
+                        <div class="m-note">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 11.4v5"/><circle cx="12" cy="7.9" r=".1" fill="currentColor" stroke-width="2.4"/></svg>
+                            <span>这些文件会移入<strong>回收站</strong>，7 天内可随时恢复。</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-ghost" type="button">取消</button>
+                        <button class="btn btn-primary" type="button">移入回收站</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 5. prompt：新建分组 ========== -->
+        <div class="qa-cell">
+            <span class="lbl">5 / prompt · 新建分组</span>
+            <div class="modal">
+                <div class="modal-mask"></div>
+                <div class="modal-body modal-confirm">
+                    <div class="m-head">
+                        <span class="m-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.2A2.2 2.2 0 0 1 5.2 6h3.4l1.8 2h8.4A2.2 2.2 0 0 1 21 10.2v7.6A2.2 2.2 0 0 1 18.8 20H5.2A2.2 2.2 0 0 1 3 17.8V8.2Z"/><path d="M12 11.6v5M9.5 14.1h5"/></svg>
+                        </span>
+                        <p class="m-eyebrow">New group</p>
+                        <h3 class="modal-title">新建分组</h3>
+                        <p class="modal-sub">分组用于归档文件，可随时改名或删除</p>
+                    </div>
+                    <div class="m-body">
+                        <label class="field">
+                            <span class="field-label">分组名称</span>
+                            <input type="text" value="设计稿" placeholder="例如：合同文档" maxlength="40">
+                            <span class="field-hint">最多 40 个字符</span>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-ghost" type="button">取消</button>
+                        <button class="btn btn-primary" type="button">创建</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 6. prompt：重命名 ========== -->
+        <div class="qa-cell">
+            <span class="lbl">6 / prompt · 重命名</span>
+            <div class="modal">
+                <div class="modal-mask"></div>
+                <div class="modal-body modal-confirm">
+                    <div class="m-head">
+                        <span class="m-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4.2L19 9.2a2 2 0 0 0 0-2.8l-1.4-1.4a2 2 0 0 0-2.8 0L4 15.8V20Z"/><path d="M14.4 6.9 17.1 9.6"/></svg>
+                        </span>
+                        <p class="m-eyebrow">Rename</p>
+                        <h3 class="modal-title">重命名文件</h3>
+                        <p class="modal-sub">IMG_7401.jpeg</p>
+                    </div>
+                    <div class="m-body">
+                        <label class="field">
+                            <span class="field-label">新文件名</span>
+                            <input type="text" value="IMG_7401" placeholder="输入新文件名">
+                            <span class="field-hint">扩展名 .jpeg 会自动保留</span>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-ghost" type="button">取消</button>
+                        <button class="btn btn-primary" type="button">保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,29 @@
+target/
+*.class
+*.iml
+.idea/
+.vscode/
+D:/cloud-disk-data/
+mysql-data/
+*.log
+*.log.*
+# 鏈湴宸ヤ綔鍖烘暟鎹紙璁板繂銆佷細璇濓級锛屼笉鍏ュ簱
+.workbuddy/
+
+# 鏈湴璋冭瘯/涓存椂鑴氭湰锛屼笉鍏ュ簱
+_qa_*.py
+_qa_*.out/
+_run.log
+_chrome2
+
+# Capacitor / 鍓嶇渚濊禆
+node_modules/
+.DS_Store
+
+
+# 临时 Chrome 调试配置（历史上误提交过，含 cookies/登录数据，别再入库）
+_tmp_lib/
+
+# 临时调试文件
+_kbd.js
+_x.txt

@@ -1,0 +1,128 @@
+server:
+  port: 8080
+  # 大文件上传：允许 Tomcat 吞掉超长请求体，避免断开
+  tomcat:
+    max-swallow-size: -1
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        # 关键：给 cookie 一个持久有效期。
+        # 默认值 -1 表示「会话 cookie」，只活在浏览器进程里——关掉浏览器、重启手机、
+        # 重启电脑，cookie 立刻消失，即使服务端 session 还好端端躺在 MySQL 里也只能重新登录。
+        # 写死 30d 后浏览器会把它存到磁盘，重启后照常带上来。
+        max-age: 30d
+        http-only: true
+        same-site: lax
+
+spring:
+  # 登录态：会话存进 MySQL（Spring Session JDBC），所以重启应用不会掉登录。
+  session:
+    store-type: jdbc
+    # 有效期必须 ≥ cookie 的 max-age，否则会出现「cookie 还在、服务端已过期」的假登录。
+    # 30 天滑动过期：期间任意一次请求自动续期，连续 30 天不访问才真正失效。
+    timeout: 30d
+    jdbc:
+      # 表结构由 config/SchemaInitializer 幂等创建，不用框架自带的脚本
+      # （框架的 schema-mysql.sql 没有 IF NOT EXISTS，二次启动会报错）
+      initialize-schema: never
+      table-name: SPRING_SESSION
+      # 每 10 分钟清一次过期会话；查询本身也会按 EXPIRY_TIME 过滤，清理只影响垃圾数据
+      cleanup-cron: "0 */10 * * * *"
+
+  # 文件上传大小限制（批量上传多文件时，max-request-size 是单次请求总上限）
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 2000MB      # 单个文件最大 2GB
+      max-request-size: 10000MB  # 单次请求（批量）最大 10GB
+  # MySQL 数据源
+  datasource:
+    # 本机 MySQL 5.7（服务名 mysql，端口 3306）。库 cloud_disk 已存在，表由 SchemaInitializer 幂等补齐。
+    url: jdbc:mysql://127.0.0.1:3306/cloud_disk?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Jackson：日期统一序列化为 ISO 字符串，便于前端解析
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+# 业务自定义配置
+file:
+  storage:
+    # 文件物理存储根目录（按 年/月/日 分子目录）
+    root: D:/cloud-disk-data/files
+  # 分块上传：大文件切片上传，中断后重新选择同一文件可续传
+  chunk:
+    # 未完成的分块临时目录（.chunks/）保留时长，超时在启动时清理
+    expire-hours: 48
+  # 回收站：删除先进回收站，超过保留天数后彻底删除（含磁盘文件）
+  recycle:
+    # 保留天数。到期后由定时任务物理删除，不再可恢复
+    keep-days: 7
+    # 清理时间表达式：每天 03:10（低峰时段）。应用启动时也会补跑一次
+    clean-cron: "0 10 3 * * ?"
+  # ffmpeg 可执行文件路径；若已加入系统 PATH，直接写 ffmpeg 即可
+  # Apple 手机视频(MOV/HEVC)需转码为 H.264 MP4 才能在 Chrome/Firefox 播放
+  ffmpeg:
+    path: ffmpeg
+    # 是否对所有视频强制转码（true=全部转码为 mp4，false=仅转码非 mp4 的封装如 mov/avi 等）
+    force-transcode: false
+
+  # 图片智能识别自动分组
+  # 原理：把上传的图片和每个分组的「样貌参考图」一起交给视觉大模型，
+  #      由模型判断图中最显著的人物是否属于某个分组，命中才改写分组。
+  # 三条保证：识别异步执行不影响上传；未填 api-key 自动跳过；只采纳 high 置信度。
+  auto-group:
+    enabled: true
+    # 通义千问（阿里云 DashScope）API Key。
+    # 建议用环境变量注入，不要直接提交明文到仓库：export DASHSCOPE_API_KEY=sk-xxx
+    # 留空则功能自动关闭，上传流程完全不受影响。
+    api-key: ${DASHSCOPE_API_KEY:}
+    # OpenAI 兼容端点，换其他厂商时只改这三项即可
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    model: qwen-vl-max
+    # 单次识别请求超时（秒）。超时即放弃，图片保持原分组
+    timeout-seconds: 40
+    # 一次最多比对多少个分组（每个分组都要附一张参考图，越多越慢越贵）
+    max-candidates: 6
+    # 只采纳这个级别及以上的置信度：high / medium / low
+    # 设成 high 意味着「宁可漏分，不可误分」
+    min-confidence: high
+    # 用户上传时已手动选了分组，是否仍允许 AI 覆盖
+    override-manual: true
+
+# 管理员账号：应用启动时自动写入数据库（sys_user 表），无需手工建库
+# 系统不提供注册入口，普通登录用户只能在「用户管理」后台页面由管理员添加
+app:
+  admin:
+    username: admin
+    # 首次启动用这个密码；BCrypt 加密后落库，明文不会写入数据库
+    password: Admin@123456
+    display-name: 系统管理员
+    # 角色固定为 ADMIN，拥有「用户管理」权限
+    role: ADMIN
+    # true=每次启动都用上面的配置覆盖数据库中的管理员密码（改密码请改配置文件）
+    # false=仅在管理员账号不存在时初始化一次，之后以数据库为准
+    sync-password: true
+
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    # SQL 日志：以前直接写 StdOut（同步写控制台/重定向文件），每个请求多花 20~30ms，
+    # 翻一张图就是一次请求，累积起来很明显。改成走 SLF4J，默认关到 info，
+    # 需要排查时把下面 logging.level.com.example.clouddisk.mapper 调成 debug 即可。
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+logging:
+  level:
+    com.example.clouddisk: debug
+    com.example.clouddisk.mapper: info
+    org.springframework.web: info

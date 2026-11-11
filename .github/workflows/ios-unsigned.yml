@@ -1,0 +1,37 @@
+# 在 GitHub Actions 的 macOS runner 上构建未签名 IPA。
+# 使用前提：
+#   1. 仓库在 GitHub 上（Gitee 仓库需要镜像一份，见 docs/native-app.md）
+#   2. 手动运行本 workflow，或推一个 ios-* 标签
+#   3. 下载 Artifacts 里的 cloud-disk-unsigned-ipa，用 Sideloadly 安装
+name: iOS 未签名 IPA
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ios-*'
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 构建 IPA
+        run: bash scripts/build-ios-ipa.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-disk-unsigned-ipa
+          path: build/cloud-disk-unsigned.ipa
+          if-no-files-found: error

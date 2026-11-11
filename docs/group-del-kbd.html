@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>三选一弹框断言</title>
+<style>
+  body { font: 14px/1.6 system-ui, sans-serif; padding: 20px; }
+  pre { background: #fff; border: 1px solid #ddd; padding: 12px; }
+</style>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+</head>
+<body>
+<pre id="r">running...</pre>
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+(function () {
+  var out = [];
+  function log(s) { out.push(s); document.getElementById('r').textContent = out.join('\n'); }
+  function press(key) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function mk() {
+    return uiConfirm({
+      icon: 'trash', eyebrow: 'Delete group', title: '删除分组「测试」？',
+      sub: '该分组下有 3 个文件，请选择如何处理',
+      note: '说明文字', danger: true,
+      altText: '仅删除分组', okText: '同时删除文件'
+    });
+  }
+
+  (async function () {
+    // T1 三个按钮都渲染
+    var p1 = mk();
+    await wait(120);
+    var d = document.querySelector('.modal-confirm');
+    log('T1 three-buttons: ' + (d.querySelectorAll('.form-actions .btn').length === 3));
+    log('T1 alt-btn-exists: ' + !!d.querySelector('[data-act="alt"]'));
+    log('T1 alt-text: ' + d.querySelector('[data-act="alt"]').textContent.trim());
+
+    // T2 点 alt → resolve 'alt'
+    d.querySelector('[data-act="alt"]').click();
+    log('T2 alt-resolves-alt: ' + ((await p1) === 'alt'));
+
+    // T3 点 ok → resolve true
+    var p3 = mk();
+    await wait(120);
+    document.querySelector('[data-act="ok"]').click();
+    log('T3 ok-resolves-true: ' + ((await p3) === true));
+
+    // T4 Esc → false
+    var p4 = mk();
+    await wait(120);
+    press('Escape');
+    log('T4 esc-resolves-false: ' + ((await p4) === false));
+
+    // T5 焦点在 alt 按钮上时按 Enter → 'alt'
+    var p5 = mk();
+    await wait(120);
+    var altBtn = document.querySelector('[data-act="alt"]');
+    altBtn.focus();
+    press('Enter');
+    log('T5 enter-on-alt: ' + ((await p5) === 'alt'));
+
+    // T6 容器聚焦时按 Enter → true（默认走主按钮）
+    var p6 = mk();
+    await wait(120);
+    press('Enter');
+    log('T6 enter-default-ok: ' + ((await p6) === true));
+
+    // T7 无 altText 时只有两个按钮，行为退回原样
+    var p7 = uiConfirm({ title: '普通确认' });
+    await wait(120);
+    var d7 = document.querySelector('.modal-confirm');
+    log('T7 two-buttons-only: ' + (d7.querySelectorAll('.form-actions .btn').length === 2));
+    d7.querySelector('[data-act="ok"]').click();
+    log('T7 resolves-true: ' + ((await p7) === true));
+
+    log('ALL-DONE');
+  })();
+})();
+</script>
+</body>
+</html>

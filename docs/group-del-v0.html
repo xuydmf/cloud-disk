@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>删除分组 · 三选一弹框</title>
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: #F4F4F6;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  /* 预览用：把弹框摆在正中，不依赖页面触发 */
+  .modal { position: fixed; inset: 0; }
+</style>
+</head>
+<body>
+<script src="../src/main/resources/static/js/dialog.js"></script>
+<script>
+  uiConfirm({
+    icon: 'trash',
+    eyebrow: 'Delete group',
+    title: '删除分组「产品资料」？',
+    sub: '该分组下有 12 个文件，请选择如何处理',
+    note: '「同时删除文件」会把 12 个文件移入<strong>回收站</strong>，7 天内可恢复；' +
+          '「仅删除分组」则保留文件，移到<strong>「未分组」</strong>。',
+    danger: true,
+    altText: '仅删除分组',
+    okText: '同时删除文件'
+  });
+</script>
+</body>
+</html>

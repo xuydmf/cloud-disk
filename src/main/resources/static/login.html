@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>登录 · 云盘</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-body">
+
+<div class="auth-shell">
+
+    <!-- ============ 左：深色品牌面 ============ -->
+    <aside class="auth-brand">
+        <div class="auth-top">
+            <span class="mark">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 19.2a4.3 4.3 0 0 1-.45-8.57 5.75 5.75 0 0 1 11.13-1.06 4.3 4.3 0 0 1-.28 9.63H6.6Z"/></svg>
+            </span>
+            <span class="rail-brand-t">
+                <strong>云盘</strong>
+                <em>Cloud Disk</em>
+            </span>
+        </div>
+
+        <div class="auth-mid">
+            <h1>文件工作台<br>团队共享的云端空间</h1>
+            <p>上传、归档、预览、批量分发，都在同一个界面里完成。</p>
+            <ul class="auth-points">
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5 11-11"/></svg>
+                    <span>图片、视频在线预览，上传即生成缩略图</span>
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5 11-11"/></svg>
+                    <span>批量分组、批量删除、一键打包下载</span>
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5 11-11"/></svg>
+                    <span>账号由管理员统一分配，不开放自助注册</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="auth-foot"><i></i>内网部署 · 数据不出本地</div>
+    </aside>
+
+    <!-- ============ 右：登录表单 ============ -->
+    <main class="auth-panel">
+        <form class="auth-form" id="loginForm" autocomplete="on" novalidate>
+            <h2>登录</h2>
+            <p class="auth-sub">请使用管理员分配的账号访问云盘</p>
+
+            <label class="field">
+                <span class="field-label">用户名</span>
+                <input id="username" name="username" type="text" placeholder="请输入用户名"
+                       autocomplete="username" spellcheck="false" autofocus required>
+            </label>
+
+            <label class="field">
+                <span class="field-label">密码</span>
+                <span class="field-pwd">
+                    <input id="password" name="password" type="password" placeholder="请输入密码"
+                           autocomplete="current-password" required>
+                    <button class="pwd-eye" id="pwdEye" type="button" aria-label="显示密码" title="显示密码">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                    </button>
+                </span>
+            </label>
+
+            <p class="auth-error" id="authError" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.2v.1"/></svg>
+                <span id="authErrorText"></span>
+            </p>
+
+            <button class="btn btn-primary auth-submit" id="loginBtn" type="submit">
+                <span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13A1.5 1.5 0 0 1 18.5 20H14"/><path d="M9 8.5 13 12l-4 3.5"/><path d="M13 12H4"/></svg></span>
+                <span id="loginBtnText">登录</span>
+            </button>
+
+            <p class="auth-note">该系统不提供注册入口。需要账号请联系管理员，在「用户管理」后台页面添加。</p>
+            <p class="auth-hint" id="capsHint" hidden>提示：<b>Caps Lock</b> 已开启</p>
+        </form>
+    </main>
+</div>
+
+<script src="js/login.js"></script>
+</body>
+</html>

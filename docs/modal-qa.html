@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>弹框验收</title>
+<!-- 直接引用项目真实样式，不做任何复制 -->
+<link rel="stylesheet" href="../src/main/resources/static/css/style.css">
+<style>
+    /* 只做「让多个弹框静态并排」的舞台布局，不覆盖任何弹框样式 */
+    body { background: #DFE1E7; }
+    .qa-stage {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        padding: 24px;
+    }
+    .qa-cell {
+        position: relative;
+        height: 480px;
+        border-radius: 12px;
+        background: #EDEEF2;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+    }
+    .qa-cell.dark { background: #1A1C21; }
+    .qa-cell > .lbl {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        z-index: 20;
+        font-family: var(--mono);
+        font-size: 9.5px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: #868D98;
+    }
+    /* 把 modal 从 fixed 降级为 absolute 以便并排 */
+    .qa-cell .modal {
+        position: absolute;
+        inset: 0;
+        padding: 22px;
+        display: grid;
+        place-items: center;
+    }
+    .qa-cell .modal[hidden] { display: grid; }
+    .qa-cell .modal-mask { animation: none; }
+    .qa-cell .modal-body { animation: none; }
+    /* 缩到能放进格子 */
+    .qa-cell .modal-form,
+    .qa-cell .modal-panel { width: 360px; }
+
+    @media (max-width: 820px) {
+        .qa-stage { grid-template-columns: 1fr; padding: 14px; gap: 16px; }
+        .qa-cell .modal-form,
+        .qa-cell .modal-panel { width: calc(100% - 44px); }
+    }
+</style>
+</head>
+<body>
+
+<div class="qa-stage">
+
+    <!-- 1. 新增用户 -->
+    <div class="qa-cell">
+        <span class="lbl">1 / 新增用户</span>
+        <div class="modal">
+            <div class="modal-mask"></div>
+            <div class="modal-body modal-form">
+                <div class="m-head">
+                    <p class="m-eyebrow">User</p>
+                    <h3 class="modal-title">新增用户</h3>
+                    <p class="modal-sub">创建后即可用该账号登录云盘</p>
+                    <button class="modal-close" type="button" aria-label="关闭">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                    </button>
+                </div>
+                <div class="m-body">
+                    <div class="form-grid">
+                        <div class="form-row2">
+                            <label class="field"><span class="field-label">用户名</span><input type="text" placeholder="登录名"></label>
+                            <label class="field"><span class="field-label">显示名</span><input type="text" placeholder="姓名 / 昵称"></label>
+                        </div>
+                        <label class="field">
+                            <span class="field-label">初始密码</span>
+                            <span class="field-pwd">
+                                <input type="password" placeholder="至少 6 位">
+                                <button class="pwd-eye" type="button" aria-label="显示密码">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                                </button>
+                            </span>
+                        </label>
+                        <label class="field"><span class="field-label">角色</span><select><option>普通用户</option><option>管理员</option></select></label>
+                        <label class="switch-row"><input type="checkbox" checked><span>允许登录</span></label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-ghost" type="button">取消</button>
+                    <button class="btn btn-primary" type="button">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 重置密码 -->
+    <div class="qa-cell">
+        <span class="lbl">2 / 重置密码</span>
+        <div class="modal">
+            <div class="modal-mask"></div>
+            <div class="modal-body modal-form">
+                <div class="m-head">
+                    <p class="m-eyebrow">Security</p>
+                    <h3 class="modal-title">重置密码</h3>
+                    <p class="modal-sub">admin · 系统管理员</p>
+                    <button class="modal-close" type="button" aria-label="关闭">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                    </button>
+                </div>
+                <div class="m-body">
+                    <div class="form-grid">
+                        <label class="field">
+                            <span class="field-label">新密码</span>
+                            <span class="field-pwd">
+                                <input type="password" placeholder="至少 6 位">
+                                <button class="pwd-eye" type="button" aria-label="显示密码">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                                </button>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-ghost" type="button">取消</button>
+                    <button class="btn btn-primary" type="button">确认重置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 移动到分组 -->
+    <div class="qa-cell">
+        <span class="lbl">3 / 移动到分组</span>
+        <div class="modal">
+            <div class="modal-mask"></div>
+            <div class="modal-body modal-panel">
+                <div class="m-head">
+                    <p class="m-eyebrow">Move to</p>
+                    <h3 class="modal-title">移动到分组</h3>
+                    <p class="modal-sub">IMG_7401.jpeg · 2.4 MB</p>
+                    <button class="modal-close" type="button" aria-label="关闭">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                    </button>
+                </div>
+                <div class="m-body">
+                    <div class="group-list">
+                        <div class="group-item"><span>未分组</span><span class="cnt">12 files</span></div>
+                        <div class="group-item current"><span>设计稿</span><span class="cnt">8 files</span></div>
+                        <div class="group-item"><span>合同文档</span><span class="cnt">3 files</span></div>
+                        <div class="group-item"><span>产品截图</span><span class="cnt">5 files</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. 图片预览 -->
+    <div class="qa-cell dark">
+        <span class="lbl">4 / 图片预览</span>
+        <div class="modal">
+            <div class="modal-mask"></div>
+            <div class="modal-body modal-media" style="width:420px;">
+                <button class="modal-close" type="button" aria-label="关闭">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                </button>
+                <div style="aspect-ratio:3/2;display:grid;place-items:center;background:linear-gradient(140deg,#3B3F4A,#24262C);color:#7C818C;font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.14em;">IMAGE 3 : 2</div>
+                <div class="gallery-cap">
+                    <span class="gallery-name">IMG_7401.jpeg</span>
+                    <span class="gallery-count">3 / 12</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

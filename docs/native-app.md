@@ -1,0 +1,223 @@
+# iOS App：Capacitor 套壳 + 原生相册 / 原生上传
+
+> 状态：工程、配置与前端接入已完成，浏览器侧回归全过。
+> **真机编译必须在 macOS + Xcode 上做**（当前开发机是 Windows，只能生成工程和同步资源）。
+
+## 1. 它解决什么问题
+
+网页版在 iPhone 上点「照片/视频」选完照片后，系统相册要先把选中的照片**导出成文件**
+（HEIC→JPEG 转码、拷贝、iCloud 原图下载），全部完成才关窗、才触发 `change`。
+10 张照片大约 2~3 秒，这段时间页面一行 JS 都没有执行，网页没有 API 能提前关窗。
+
+原生壳把「选图」换成 PHPicker：
+
+| | 网页版 `<input type=file>` | App（本工程） |
+|---|---|---|
+| 点「添加」后关窗 | 等系统导出完（10 张 ≈ 2~3 s） | **立即关**，取文件在 App 里异步做 |
+| 等待期间用户看到 | 卡住的系统相册 | App 自己的「正在从相册导入…」 |
+| 大视频 | 整段读进 WebView 内存 | 原生 `FileTransfer` 从磁盘直接发，不进 JS |
+
+「上传/预览/列表/回收站」等仍然由服务器上的网页提供，**前端改完不用重新发版**。
+
+## 2. 结构
+
+```
+package.json                     Capacitor 依赖与脚本
+capacitor.config.json            appId / server.url / iOS 选项
+ios/                             Xcode 工程（Swift Package Manager，无 Pods）
+  App/App/Info.plist             相册/相机/本地网络权限 + ATS
+  App/CapApp-SPM/Package.swift   由 cap sync 生成，引用 node_modules 里的插件
+src/main/resources/static/js/native.js   原生桥接层（浏览器里完全禁用）
+src/main/resources/static/js/app.js      接入点：openPicker / prepare / uploadNative
+```
+
+依赖：
+
+- `@capacitor/core`、`@capacitor/ios`、`@capacitor/cli` 8.6.0
+- `@capacitor/camera` 8.2.6 —— `chooseFromGallery()` 走 PHPicker，返回 `webPath` / `uri` / `metadata.creationDate`
+- `@capacitor/file-transfer` 2.0.6 —— 从原生文件路径直传，带进度事件
+
+## 3. 运行方式（server.url 模式）
+
+`capacitor.config.json` 里：
+
+```json
+"server": { "url": "http://192.168.3.31:8080", "cleartext": true }
+```
+
+App 启动后直接加载这台服务器上的网页：
+
+- 好处：网页更新立即生效；现有代码全是 `/api/...` 相对路径，一行都不用改。
+- 代价：**必须连得到这台服务器**，断网就是白屏；这是「局域网/内网自用」的形态。
+  如果要做离线可用的 App，需要把前端改成使用绝对 API 地址 + 本地资源，工作量另算。
+
+换服务器地址：改 `server.url` → `pnpm exec cap sync ios` → Xcode 重新运行。
+
+## 4. 构建（在 macOS 上）
+
+前置：macOS、Xcode 16+、Node 20+、pnpm。
+
+```bash
+pnpm install          # ios/App/CapApp-SPM/Package.swift 引用 node_modules 里的插件，必须先装依赖
+pnpm exec cap sync ios
+pnpm exec cap open ios
+```
+
+Xcode 里：
+
+1. 选 `App` target → **Signing & Capabilities** → 选自己的 Team（Bundle ID 默认 `com.example.clouddisk`，可改）。
+2. 选真机运行。首次启动会请求「本地网络」权限（连接局域网服务器需要）。
+3. 打开后登录，点「照片/视频」验证：点「添加」应立即回 App，并出现「正在从相册导入…」。
+
+> 也可以用脚本一键出**未签名** IPA（不需要打开 Xcode 界面）：
+> `bash scripts/build-ios-ipa.sh`，产物在 `build/cloud-disk-unsigned.ipa`。
+> 适合云端 Mac / CI，也适合没有开发者账号、准备用 Sideloadly 侧载的情况。
+
+> Windows 上 `cap add/sync` 都能跑（生成工程、写 Package.swift、复制资源），只有编译和签名不行。
+> 没有 Mac 的完整方案见第 9 节。
+
+## 5. 实现了什么
+
+### 5.1 原生选图（`native.js` + `openPicker`）
+
+- 仅当 `window.Capacitor.isNativePlatform()` 且 `Camera.chooseFromGallery` 存在时启用；
+  浏览器里 `NativeShell.canPick() === false`，相册按钮仍然走原来的 `<input type="file">`。
+- 调用 `chooseFromGallery({ allowMultipleSelection: true, limit: 0, includeMetadata: true })`。
+- 返回两类「描述对象」，都不直接变成 File：
+  - 照片 `{ nativePhoto, webPath, name, size, type, lastModified }`
+  - 视频 `{ nativePath, name, size, type, lastModified }`
+- 文件名由拍摄时间生成：`IMG_20260920_183000.jpg`（同一秒多张自动加 `_2`）；视频优先用原生路径的文件名，
+  保证确认面板和库里显示一致。
+
+### 5.2 照片按需读取
+
+上传流水线轮到某一张照片时才 `fetch(webPath)` 读成 Blob，再走原来的压缩逻辑。
+不会把整批 20 张先变成 60 MB Blob 压在 WKWebView 里；内存峰值约等于并发数。
+
+### 5.3 视频原生直传
+
+视频不读进 JS：`prepare()` 发现 `nativePath` 就原样带到上传阶段，
+由 `NativeShell.upload()` 调 `FileTransfer.uploadFile()` 从磁盘直接发。
+
+- 服务端接口不变：multipart 字段 `file`，`groupId` / `capturedTime` 放查询参数（`@RequestParam` 两者都认）。
+- 进度用 `FileTransfer` 的 `progress` 事件回填到现有进度面板。
+- 重试、`code=2`（重复文件）、401 跳登录等语义与网页直传一致。
+- 原生上传走「大文件串行链」，避免两路进度事件混在一起。
+
+## 6. 验证
+
+已在 Windows + Chrome（CDP）里完成：
+
+- **原生桥接模拟**（注入假的 Capacitor）：`pickMedia` 参数与返回、照片描述对象、视频描述对象、
+  `readFile`、`upload` 的 multipart/查询参数/进度/监听器清理、`uploadNative` 的 code=0 / code=2 / addSent、
+  `openPicker` 走原生分支并交给 `uploadFiles` —— 9/9 通过。
+- **网页兜底**：没有 Capacitor 时原生层禁用、相册按钮仍触发 `<input>`、真实上传一张图并清理 —— 4/4 通过。
+
+真机上还需要确认（Windows 无法执行）：
+
+1. 选 10~20 张：点「添加」到回到 App 的时间（应≈立即），以及「正在从相册导入…」出现多久。
+2. 导入完成后确认面板的张数/日期/大小是否正确（`creationDate` 决定按天分组）。
+3. 视频上传：进度、完成后库里文件名、可播放。
+4. 切后台/锁屏时上传是否中断（见下）。
+5. `server.url` 换成本机实际 IP 后能否登录（cookie 持久化）。
+
+## 7. 已知限制 / 下一步
+
+- **真正的后台上传没有做**：`@capacitor/file-transfer` 是前台 URLSession，App 切后台会被 iOS 挂起。
+  要「锁屏也继续传」需要自定义 Swift 插件（background `URLSessionConfiguration` + AppDelegate 回调），
+  这一步建议在 Mac 上单独做一轮，且要真机验证。
+- 视频的文件名取决于插件给的临时文件路径；如果它给的是 UUID，库里的名字会不好看。
+  后续可以在原生侧复制成目标文件名再传（会多一次磁盘拷贝）。
+- `window.open()`（在线编辑、下载）在 WebView 里和浏览器行为不同，需要的话接 `@capacitor/browser`。
+- App Store 审核风险：这是「网页 + 原生选图/上传」的壳，属于 Guideline 4.2 的灰色地带，
+  适合自用 / TestFlight / 企业分发；公开上架需要补原生功能。
+- iOS 不允许明文 HTTP：`Info.plist` 里用 `NSAllowsArbitraryLoads` 放行了 ATS（见下）。
+  以后上 HTTPS 应收紧成域名白名单。
+
+## 8. Info.plist 改了什么
+
+```xml
+NSCameraUsageDescription            拍照上传
+NSPhotoLibraryUsageDescription      从相册选择照片/视频
+NSPhotoLibraryAddUsageDescription   保存编辑后的图片
+NSLocalNetworkUsageDescription      连接局域网云盘服务器
+NSAppTransportSecurity              NSAllowsArbitraryLoads = true（放行 http://192.168.x.x）
+```
+
+PHPicker 正常不触发相册权限弹窗；如果弹了，是 Camera 插件为了取 `metadata`（拍摄时间/大小/格式）。
+
+## 9. 没有 Mac 怎么办
+
+先说一句：**日常改前端不需要 Mac**。App 加载的是服务器上的网页，改 UI / 逻辑只重启服务器
+（`java -jar target/cloud-disk.jar`）即可；只有原生插件、`Info.plist`、`server.url` 变了才要重新打包。
+
+Mac 只在「把工程编译成 IPA」这一步需要。四条路：
+
+| 路线 | 花钱 | 你还需要 | 安装有效期 |
+|---|---|---|---|
+| 云端 Mac 按小时 + 免费签名 | 几十元/次 | Windows + Sideloadly | 7 天，到期重签 |
+| GitHub Actions + 免费签名 | 0（公开仓库） | GitHub 账号 + Windows | 7 天，到期重签 |
+| Codemagic / Appflow + TestFlight | $99/年（中国区约 ¥688） | 开发者账号 | 90 天 / 构建 |
+| 二手 Mac mini | 2000~3000 元 | 一台 Mac | 永久 |
+
+### 路线 A：租一台云端 Mac（最直接）
+
+MacinCloud、Scaleway、AWS EC2 Mac、国内 Mac 云主机都可以按小时租，
+**选预装 Xcode 16+ 的镜像**（Xcode 十几个 GB，自己下很浪费时间）。
+
+```bash
+git clone <你的仓库>
+cd cloud-disk
+npm i -g pnpm
+bash scripts/build-ios-ipa.sh
+```
+
+产物 `build/cloud-disk-unsigned.ipa` 用 scp / 网盘拷回 Windows，按下面「Windows 侧安装」操作。
+
+### 路线 B：GitHub Actions（最省钱）
+
+Gitee 仓库镜像一份到 GitHub（私有/公开都行）：
+
+```bash
+git remote add github git@github.com:<你的账号>/cloud-disk.git
+git push github master
+```
+
+然后在 GitHub 的 Actions 页面手动运行 **「iOS 未签名 IPA」**（或推一个 `ios-*` 标签），
+构建完在 Artifacts 里下载 `cloud-disk-unsigned-ipa`，解压就是 ipa。
+
+> 公开仓库的 macOS runner 免费；私有仓库按 10 倍分钟计费，一次构建约 5~10 分钟。
+> workflow 在 `.github/workflows/ios-unsigned.yml`，底层就是 `scripts/build-ios-ipa.sh`。
+
+### 路线 C：Codemagic / Ionic Appflow + TestFlight（完全不碰 Mac）
+
+有 $99 开发者账号时最省心：Codemagic 连 Git（支持 GitHub/GitLab/Bitbucket/自定义 Git），
+配好 App Store Connect API Key 后能**自动签名并上传 TestFlight**，iPhone 装 TestFlight 安装，
+每个构建 90 天有效。全程不需要 Mac。
+
+### Windows 侧安装（Sideloadly / AltStore）
+
+1. 电脑装 iTunes（或 Apple Devices）+ Sideloadly。
+2. 数据线连 iPhone，手机上点「信任此电脑」。
+3. Sideloadly 选 `cloud-disk-unsigned.ipa`，输入 Apple ID（双重认证要填验证码）。
+   > 未签名 IPA 是正常输入，Sideloadly 会用你的账号重新签名。
+4. iPhone：设置 → 通用 → VPN 与设备管理 → 信任你的开发者证书。
+5. 打开 App；免费账号 **7 天后过期**，重连 Sideloadly 重签即可。
+   想自动续签可以用 AltStore（同 Wi-Fi 的电脑挂着 AltServer）。
+
+免费 Apple ID 的限制：同时最多 3 个 App、每周 10 个 App ID、证书 7 天。
+$99 账号：ad hoc 安装 1 年，或走 TestFlight。
+
+### 连不上服务器？
+
+`server.url` 是打包时写进 App 的，必须是手机能访问到的地址：
+
+- 同一 Wi-Fi：直接用 `http://<电脑局域网 IP>:8080`（当前配置 `192.168.3.31`）。
+- 不在同一网络：用 Tailscale / ZeroTier / frp 把服务器的 8080 暴露成一个地址，
+  改 `capacitor.config.json` 的 `server.url`，重新跑一次构建脚本。
+
+### 不想打包的兜底
+
+Safari → 分享 → 「添加到主屏幕」也能得到图标和全屏，**但选图等待依旧存在**（那是 WebKit 的限制，
+不是浏览器 UI 的问题），所以它只能算临时方案。
+
