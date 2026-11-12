@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <title>登录 · 云盘</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=20261112c">
 </head>
 <body class="auth-body">
 
@@ -62,8 +62,9 @@
                 <span class="field-pwd">
                     <input id="password" name="password" type="password" placeholder="请输入密码"
                            autocomplete="current-password" required>
-                    <button class="pwd-eye" id="pwdEye" type="button" aria-label="显示密码" title="显示密码">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                    <button class="pwd-eye" id="pwdEye" type="button" aria-label="显示密码" title="显示密码" aria-pressed="false">
+                        <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.9-6.5 10-6.5S22 12 22 12s-3.9 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+                        <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.9 10.9 0 0 1 12 5c6.1 0 10 7 10 7a17.6 17.6 0 0 1-2.5 3.6"/><path d="M6.4 6.4A17.4 17.4 0 0 0 2 12s3.9 7 10 7c1 0 1.9-.2 2.8-.5"/></svg>
                     </button>
                 </span>
             </label>
@@ -85,6 +86,6 @@
 </div>
 
 <script src="js/api-bridge.js?v=20261112b"></script>
-<script src="js/login.js?v=20261112b"></script>
+<script src="js/login.js?v=20261112c"></script>
 </body>
 </html>

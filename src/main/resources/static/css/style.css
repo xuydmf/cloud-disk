@@ -2614,29 +2614,53 @@ body.selecting .main { padding-bottom: 96px; }
 
 .field-pwd { position: relative; display: block; }
 
-.field-pwd input { padding-right: 38px; }
+.field-pwd input { padding-right: 46px; }
 
 .pwd-eye {
     position: absolute;
     top: 50%;
-    right: 5px;
+    right: 4px;
+    z-index: 1;
     transform: translateY(-50%);
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     padding: 0;
     border: 0;
     border-radius: var(--r-sm);
     background: transparent;
-    color: var(--text-3);
+    color: var(--text-2);
     cursor: pointer;
+    touch-action: manipulation;
     transition: color .12s var(--ease), background .12s var(--ease);
 }
 
-.pwd-eye svg { width: 14px; height: 14px; }
+.pwd-eye svg { width: 18px; height: 18px; }
 
-.pwd-eye:hover { color: var(--text-2); background: rgba(16, 18, 22, .05); }
+.pwd-eye .eye-off { display: none; }
+
+.pwd-eye.is-on {
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.pwd-eye.is-on .eye-on { display: none; }
+.pwd-eye.is-on .eye-off { display: block; }
+
+.pwd-eye:hover { color: var(--text); background: rgba(16, 18, 22, .06); }
+
+.pwd-eye:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* iOS 聚焦密码框时，系统会在最右侧放一个「密码钥匙」图标；
+   触摸设备上把显示/隐藏按钮往里让 30px，避免被它盖住点不到。 */
+@media (pointer: coarse) {
+    .field-pwd input { padding-right: 76px; }
+    .pwd-eye { right: 34px; }
+}
 
 .auth-error {
     display: flex;

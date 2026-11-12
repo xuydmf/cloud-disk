@@ -38,12 +38,14 @@
         })
         .catch(() => { /* 离线时留给表单提交报错 */ });
 
-    // 密码显隐
+    // 密码显隐：图标 + 文字状态都跟着变，避免只有一个很淡的小眼睛
     pwdEye.addEventListener('click', () => {
-        const showing = passwordEl.type === 'text';
-        passwordEl.type = showing ? 'password' : 'text';
-        pwdEye.title = showing ? '显示密码' : '隐藏密码';
-        pwdEye.style.color = showing ? '' : 'var(--accent)';
+        const show = passwordEl.type === 'password';
+        passwordEl.type = show ? 'text' : 'password';
+        pwdEye.classList.toggle('is-on', show);
+        pwdEye.setAttribute('aria-pressed', show ? 'true' : 'false');
+        pwdEye.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+        pwdEye.title = show ? '隐藏密码' : '显示密码';
         passwordEl.focus();
     });
 
