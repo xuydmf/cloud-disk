@@ -5,6 +5,11 @@
    ============================================================ */
 
 :root {
+    /* 刘海屏 / 底部小黑条的安全区：WKWebView 用 contentInset:never，
+       页面画到整屏，靠这些值把内容让进安全区 */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+
     /* ---- rail (dark) ---- */
     --rail-bg-top: #101216;
     --rail-bg-bottom: #0B0C0F;
@@ -100,6 +105,8 @@ svg { display: block; }
     position: sticky;
     top: 0;
     height: 100vh;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
     display: flex;
     flex-direction: column;
     background:
@@ -415,11 +422,11 @@ kbd {
     top: 0;
     z-index: 30;
     flex: none;
-    height: 54px;
+    height: calc(54px + var(--safe-top));
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 18px;
+    padding: var(--safe-top) 18px 0;
     background: rgba(247, 247, 249, .82);
     backdrop-filter: saturate(180%) blur(14px);
     -webkit-backdrop-filter: saturate(180%) blur(14px);
@@ -586,7 +593,7 @@ kbd {
     width: 100%;
     max-width: 1320px;
     margin: 0 auto;
-    padding: 22px 18px 60px;
+    padding: 22px 18px calc(60px + var(--safe-bottom));
 }
 
 /* ---- page head ---- */
@@ -2091,7 +2098,7 @@ body.selecting .main { padding-bottom: 96px; }
 .batch-bar {
     position: fixed;
     left: 50%;
-    bottom: 22px;
+    bottom: calc(22px + var(--safe-bottom));
     z-index: 90;
     display: flex;
     align-items: center;
@@ -2186,7 +2193,7 @@ body.selecting .main { padding-bottom: 96px; }
 .toast {
     position: fixed;
     left: 50%;
-    bottom: 26px;
+    bottom: calc(26px + var(--safe-bottom));
     transform: translateX(-50%);
     z-index: 200;
     padding: 8px 15px;
@@ -2243,8 +2250,8 @@ body.selecting .main { padding-bottom: 96px; }
 
     .rail-toggle { display: grid; }
     .search input { width: 180px; }
-    .main { padding: 18px 14px 52px; }
-    .topbar { padding: 0 14px; }
+    .main { padding: 18px 14px calc(52px + var(--safe-bottom)); }
+    .topbar { padding: var(--safe-top) 14px 0; }
 }
 
 @media (max-width: 820px) {
@@ -2278,7 +2285,7 @@ body.selecting .main { padding-bottom: 96px; }
 }
 
 @media (max-width: 680px) {
-    .topbar { gap: 8px; padding: 0 12px; }
+    .topbar { gap: 8px; padding: var(--safe-top) 12px 0; }
     .topbar-right { flex: 1 1 auto; min-width: 0; gap: 6px; }
     .search { flex: 1 1 auto; min-width: 0; }
     .search input { width: 100%; min-width: 0; }
@@ -2443,7 +2450,7 @@ body.selecting .main { padding-bottom: 96px; }
     flex-direction: column;
     justify-content: space-between;
     gap: 40px;
-    padding: 32px 46px 30px;
+    padding: calc(32px + var(--safe-top)) 46px 30px;
     overflow: hidden;
     background:
         radial-gradient(118% 52% at 16% 0%, rgba(91, 91, 214, .20), transparent 64%),
@@ -3036,7 +3043,7 @@ body.selecting .main { padding-bottom: 96px; }
 
     .auth-brand {
         justify-content: flex-start;
-        padding: 20px 22px 24px;
+        padding: calc(20px + var(--safe-top)) 22px 24px;
         gap: 18px;
         border-right: 0;
         border-bottom: 1px solid var(--rail-line);
@@ -3047,7 +3054,7 @@ body.selecting .main { padding-bottom: 96px; }
     .auth-points { display: none; }
     .auth-foot { display: none; }
 
-    .auth-panel { padding: 26px 22px 46px; align-items: start; }
+    .auth-panel { padding: 26px 22px calc(46px + var(--safe-bottom)); align-items: start; }
     .auth-form { max-width: 400px; }
 
     /* 主按钮在窄屏只留图标（工作台里的规则），登录按钮必须保留「登录」二字 */
