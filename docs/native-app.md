@@ -77,41 +77,30 @@ Xcode 里：
 
 ## 5. 实现了什么
 
-### 5.1 原生选图（`native.js` + `openPicker`）
+### 5.1 自定义相册（`native/photo-album` + `native.js`）
 
-真机验证发现：`@capacitor/camera` 的 `chooseFromGallery` **底层不是 PHPicker**，而是 IONCAMR
-自己画的相册（`PHAsset` + 自定义界面）。它要等所有照片导出完才 `dismiss`，所以点「添加」后
-相册仍然卡几秒——和网页版一样，原生壳并没有解决。
+`@capacitor/camera` 的两条路都不合适：
 
-现在的分工：
+- `chooseFromGallery` 底层是 IONCAMR 自绘相册，关窗前要把整批资产导出完；
+- `pickImages` 是系统 PHPicker，快，但界面不是我们要的（不是「按日期分组的本地相册」）。
 
-| 类型 | 接口 | 关窗速度 |
-|---|---|---|
-| 照片 | `Camera.pickImages()`（系统 PHPicker） | **点「添加」立即关**，回调异步 |
-| 视频 | `Camera.chooseFromGallery()`（IONCAMR 相册） | 仍要等导出（视频少、体积大，暂时接受） |
+所以写了一个本地 Capacitor 插件 `native/photo-album`（Swift + SPM）：
 
-- 仅当 `window.Capacitor.isNativePlatform()` 时启用；浏览器里 `NativeShell.canPickPhotos() === false`，
-  相册按钮仍然走原来的 `<input type="file">`。
-- 原生壳里点「照片/视频」先弹一个小面板选「照片 / 视频」（`#mediaSheet`）：
-  - 照片：`pickImages({ limit: 20, width: 2560, height: 2560, quality: 86 })`
-    —— 原生侧按长边 2560 / q86 缩好，返回临时 JPEG 的 `webPath`；
-    描述对象 `{ nativePhoto: true, precompressed: true, webPath, name, size, type, lastModified }`，
-    上传流水线不再用 canvas 压第二次。
-  - 视频：`chooseFromGallery({ mediaType: Video, allowMultipleSelection: true })`，
-    描述对象 `{ nativePath, name, size, type, lastModified }`。
-- `pickImages` 在 iOS 上会先要「照片」权限，**必须选「允许访问所有照片」**；选「有限访问」插件会拒绝，
-  前端会提示去 设置 → 隐私与安全性 → 照片 改权限。
-- 一次最多 20 张：PHPicker 回调里会把整批解码后的 `UIImage` 攒在内存里（每张 2560 长边约 20 MB），
-  再往上加有被 iOS 杀进程的风险；更多请分批选。
-- 文件名由拍摄时间生成：`IMG_20260920_183000.jpg`（同一秒多张自动加 `_2`），拍摄时间优先取 EXIF
-  `DateTimeOriginal`；视频优先用原生路径的文件名，保证确认面板和库里一致。
+- `PHAsset` 拉取照片/视频，按天分组，`UICollectionView` 三列缩略图；
+- 角标：LIVE、视频时长；多选，最多 20 项；
+- 点「添加」**先 dismiss 相册**，再由插件在后台逐张 `PHAssetResourceManager.writeData`
+  写临时文件；写完才 resolve，期间 JS 显示「正在从相册导入…」；
+- 返回 `{ files: [{ path, webPath, name, size, type, creationDate, isVideo }] }`；
+- 照片 `webPath` → JS 按需读取后压缩；视频 `file://` → 原生 `FileTransfer` 直传。
+
+原生壳里点「照片/视频」**直接开这个相册**；旧安装包没有插件时退回 `#mediaSheet`（照片/视频面板）。
+权限：`PHPhotoLibrary.requestAuthorization(for: .readWrite)`；拒绝/受限时前端提示去设置。
 
 ### 5.2 照片按需读取
 
-上传流水线轮到某一张照片时才 `fetch(webPath)` 读成 Blob（一次一张，内存峰值约等于并发数）。
-照片已经在原生侧缩到 2560 / q86，所以 `prepare()` 直接返回、跳过 canvas 压缩。
-
-> 代价：原生照片固定是 2560 的 JPEG，工具栏的「上传原图」开关对原生选图不生效。
+插件导出的是**原文件**（可能是 HEIC）。上传流水线轮到某一张照片时才
+`fetch(webPath)` 读成 Blob（一次一张，内存峰值约等于并发数），再走原来的 canvas 压缩
+（长边 2560 / q86）。不再像 `pickImages` 那样在原生侧预压缩，所以「上传原图」开关仍对照片生效。
 
 ### 5.3 视频原生直传
 
@@ -127,38 +116,41 @@ Xcode 里：
 
 已在 Windows + Chrome（CDP）里完成：
 
-- **原生桥接模拟**（注入假的 Capacitor）：`pickPhotos` 调 `pickImages` 的参数（20 张 / 2560 / q86）、
-  照片描述对象（`precompressed`、EXIF 拍摄时间）、`pickVideos` 只选视频、点「照片/视频」弹面板、
-  面板「照片」交给 `uploadFiles`、`precompressed` 照片真实上传（跳过 canvas 压缩）—— 9/9 通过。
+- **自定义相册 JS 胶水**（注入假的 `PhotoAlbum` 插件）：`canPickAlbum`、`pickAlbum` 的
+  `webPath`/`nativePath`/拍摄时间映射、`limit=20`、点相册按钮直接开自定义相册（不再弹旧面板）—— 4/4 通过。
+- **旧回退路径**（注入假的 Camera）：`pickPhotos` 调 `pickImages`、`pickVideos`、
+  「照片/视频」面板、`precompressed` 上传 —— 9/9 通过（旧安装包没有相册插件时用）。
 - **独立 App 模式**：静态资源在 8099（模拟 `capacitor://localhost`），接口在 8080；
   跨域登录拿 token、`/api/auth/current`、列表、缩略图带 `?token=` 能显示、XHR 上传、退出登录清 token —— 6/6 通过。
 - **网页模式**：同源 cookie 登录、无 token、缩略图相对地址、真实上传 —— 4/4 通过。
 
+> Swift 相册插件本身只能在 macOS / GitHub Actions 上编译，Windows 无法本地验证；
+> 第一次跑 workflow 时重点看 `PhotoAlbumPlugin` 的编译日志。
+
 真机上还需要确认（Windows 无法执行）：
 
 1. 装好后登录（token 模式）能否保持，杀 App 重开是否免登录。
-2. 选 10~20 张照片：点「添加」应立即回到 App（相册不再停住），随后出现「正在从相册导入照片…」。
-3. 首次使用会弹照片权限，选「全部照片」；确认面板的张数/日期/大小正确。
-4. 视频上传：进度、完成后库里文件名、可播放；视频这条路的关窗等待仍然存在。
-5. 20 张一批的内存表现（若被杀进程，把 `limit` 调小或分批）。
+2. 打开相册：日期分组、三列缩略图、LIVE/视频时长角标是否正常。
+3. 选 10~20 张 → 点「添加」：相册应**立即关闭**，回到 App 显示「正在从相册导入…」；
+   导入完成后确认面板的张数/日期/大小正确。
+4. 视频：时长角标、上传进度、完成后库里文件名、可播放。
+5. 权限：首次弹「照片」权限；选「有限访问」时只能看到受限的资产（v1 不做管理入口）。
+6. 20 张上限、导出大视频时的内存/等待时间。
 
 ## 7. 已知限制 / 下一步
 
+- **自定义相册 v1 的边界**：只有「全部照片」按日期分组，没有相册切换、没有「管理有限访问」、
+  没有导出进度条；点「添加」后相册立即关，但大视频的导出仍要等（只是不再挡着界面）。
 - **独立 App 的代价**：页面在安装包里，**改前端（含 JS/CSS/HTML）必须重新打包、重新安装**，
   不像原来的网页壳那样改完刷新就生效。原生插件、`api-bridge.js` 的服务器地址同理。
 - **服务器地址是打包时写死的**：`api-bridge.js` 的 `DEFAULT_BASE`。电脑 IP 变了就得改它重新打包；
   后续可以在 App 里加一个「服务器地址」设置页（存 localStorage）。
-- **照片**：`pickImages` 已经能在点「添加」时立即关窗；但它是 `@capacitor/camera` 的旧接口
-  （已标记 deprecated），未来升级插件可能移除。长期方案是写一个自定义 PHPicker 插件：
-  选完立即返回文件 token，再按需一张一张 load，彻底避免整批 `UIImage` 驻留内存。
-- **视频**：仍走 IONCAMR 相册，关窗前要导出，几秒钟的等待仍然存在；要彻底解决同样需要自定义插件。
 - **真正的后台上传没有做**：`@capacitor/file-transfer` 是前台 URLSession，App 切后台会被 iOS 挂起。
   要「锁屏也继续传」需要自定义 Swift 插件（background `URLSessionConfiguration` + AppDelegate 回调），
   这一步建议在 Mac 上单独做一轮，且要真机验证。
-- 视频的文件名取决于插件给的临时文件路径；如果它给的是 UUID，库里的名字会不好看。
-  后续可以在原生侧复制成目标文件名再传（会多一次磁盘拷贝）。
+- 视频的文件名由插件按拍摄时间生成（`VID_...mov`）；和相册里的原始文件名不同。
 - `window.open()`（下载）在 WebView 里和浏览器行为不同；在线编辑在原生模式改成同页打开。
-- App Store 审核风险：这是「本地页面 + 原生选图/上传 + 远程 API」的 App，
+- App Store 审核风险：这是「本地页面 + 原生相册/上传 + 远程 API」的 App，
   比纯网页壳好一些，但功能仍偏薄，公开上架需要补原生功能。
 - iOS 不允许明文 HTTP：`Info.plist` 里用 `NSAllowsArbitraryLoads` 放行了 ATS（见下）。
   以后上 HTTPS 应收紧成域名白名单。

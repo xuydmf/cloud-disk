@@ -720,32 +720,33 @@ cloud-disk/
 
 所以做了一个 Capacitor App，**页面资源打包进安装包**（启动不读服务器网页），接口仍走服务器：
 
-- 相册：照片走 `Camera.pickImages()`（系统 PHPicker），点「添加」立即关；视频仍走原相册。
+- 相册：自研原生相册插件 `native/photo-album`（Swift + SPM）——按日期分组、三列缩略图、
+  LIVE/视频角标、多选；点「添加」**先关相册**，再后台导出，照片/视频都走同一套上传。
 - 接口：页面在 `capacitor://localhost`，跨域访问服务器不带 cookie，改用
   `X-Auth-Token`（Spring Session id）+ `Authorization: Bearer`，图片/视频用 `?token=`。
 - 代价：**改前端要重新打包安装**（不再「刷新即生效」）；服务器 IP 写死在 `api-bridge.js`。
 
 | | 网页 `<input type=file>` | App |
 |---|---|---|
-| 照片关窗 | 等系统导出完（10 张 ≈ 2~3 s） | **立即关**（`pickImages` + PHPicker） |
-| 视频关窗 | 等系统导出完 | 仍要等（IONCAMR 相册，暂时接受） |
+| 相册界面 | 系统选择器 | 自研「本地相册」：日期分组 + 多选 |
+| 点「添加」关窗 | 等系统导出完（10 张 ≈ 2~3 s） | **立即关**，后台导出 |
 | 等待期间 | 卡住的系统相册 | App 的「正在从相册导入…」 |
-| 照片上传 | Blob → 压缩 → XHR | 原生缩到 2560/q86 → 按需读取 → 上传 |
+| 照片上传 | Blob → 压缩 → XHR | 原文件按需读取 → canvas 压缩 → 上传 |
 | 视频上传 | 整段进 WebView 内存 | 原生 `FileTransfer` 从磁盘直传，不进 JS |
 | 启动 | 打开网页 | 本地页面，秒开；断网时列表/上传不可用 |
 | 更新 | 刷新即生效 | 重新 Actions 打包 + 重装 |
 
-原生壳里点「照片/视频」会先弹一个「照片 / 视频」选择面板；照片一次最多 20 张，
-首次使用要允许「访问所有照片」（「有限访问」会被插件拒绝）。
+原生壳里点「照片/视频」直接打开自研相册；一次最多 20 项，首次使用要允许「照片」权限。
 
-接入点都在前端，浏览器里自动禁用（`NativeShell.canPickPhotos() === false`），PC / 手机浏览器行为不变：
+接入点都在前端，浏览器里自动禁用（`NativeShell.canPickAlbum() === false`），PC / 手机浏览器行为不变：
 
 | 位置 | 作用 |
 |------|------|
+| `native/photo-album/` | 自研相册插件：`PHAsset` 分组 + `UICollectionView` + 后台导出 |
 | `static/js/api-bridge.js` | 跨域 API 桥：绝对地址 + Bearer token；网页里原样不动 |
-| `static/js/native.js` | 桥接层：`pickPhotos`（PHPicker）/ `pickVideos` / `readFile` / `upload`（FileTransfer） |
-| `app.js#openPicker` | 相册按钮在原生 App 里打开 `#mediaSheet` 选择面板 |
-| `app.js#prepare` | `precompressed` 照片跳过 canvas 压缩；视频保留 `nativePath` |
+| `static/js/native.js` | 桥接层：`pickAlbum` / `readFile` / `upload`（FileTransfer）；旧包回退到 `pickPhotos`/`pickVideos` |
+| `app.js#openPicker` | 相册按钮在原生 App 里打开自定义相册（旧包回退 `#mediaSheet`） |
+| `app.js#prepare` | 照片按需读取 + canvas 压缩；视频保留 `nativePath` |
 | `app.js#uploadNative` | 原生直传，重试 / 重复 / 401 语义与网页直传一致 |
 | `config/TokenAuthService.java` | token 鉴权（复用 Spring Session，30 天滑动过期） |
 

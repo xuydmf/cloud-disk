@@ -13,7 +13,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.6.0"),
         .package(name: "CapacitorCamera", path: "../../../node_modules/.pnpm/@capacitor+camera@8.2.6_@capacitor+core@8.6.0/node_modules/@capacitor/camera"),
-        .package(name: "CapacitorFileTransfer", path: "../../../node_modules/.pnpm/@capacitor+file-transfer@2.0.6_@capacitor+core@8.6.0/node_modules/@capacitor/file-transfer")
+        .package(name: "CapacitorFileTransfer", path: "../../../node_modules/.pnpm/@capacitor+file-transfer@2.0.6_@capacitor+core@8.6.0/node_modules/@capacitor/file-transfer"),
+        .package(name: "CloudDiskPhotoAlbum", path: "../../../node_modules/.pnpm/@cloud-disk+photo-album@fil_3dd6a47b0eed2354330cfbcc68657086/node_modules/@cloud-disk/photo-album")
     ],
     targets: [
         .target(
@@ -22,7 +23,8 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "CapacitorCamera", package: "CapacitorCamera"),
-                .product(name: "CapacitorFileTransfer", package: "CapacitorFileTransfer")
+                .product(name: "CapacitorFileTransfer", package: "CapacitorFileTransfer"),
+                .product(name: "CloudDiskPhotoAlbum", package: "CloudDiskPhotoAlbum")
             ]
         )
     ]

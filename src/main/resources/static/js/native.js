@@ -22,6 +22,7 @@
     const plugins = (cap && cap.Plugins) || {};
     const Camera = plugins.Camera || null;
     const FileTransfer = plugins.FileTransfer || null;
+    const PhotoAlbum = plugins.PhotoAlbum || null;
 
     const VIDEO_MIME = {
         mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/x-m4v',
@@ -74,6 +75,10 @@
         }
     }
 
+    function canPickAlbum() {
+        return native && !!PhotoAlbum && typeof PhotoAlbum.pick === 'function';
+    }
+
     function canPickPhotos() {
         // 注意：用的是旧接口 pickImages，不是 chooseFromGallery。
         // chooseFromGallery 底层是 IONCAMR 自己画的相册，它会等所有照片导出完才 dismiss，
@@ -86,7 +91,7 @@
     }
 
     function canPick() {
-        return canPickPhotos() || canPickVideos();
+        return canPickAlbum() || canPickPhotos() || canPickVideos();
     }
 
     function canUpload() {
@@ -186,6 +191,51 @@
         }).filter(function (f) { return f.nativePath && String(f.nativePath).length > 0; });
     }
 
+    /**
+     * 自定义相册（原生 Swift 组件）：按日期分组、多选、点「添加」立即关。
+     * 返回文件路径；照片由 JS 读取后压缩，视频交给 FileTransfer。
+     */
+    async function pickAlbum() {
+        if (!canPickAlbum()) return [];
+        let res;
+        try {
+            res = await PhotoAlbum.pick({ limit: 20 });
+        } catch (e) {
+            if (/cancel/i.test((e && e.message) || '')) return [];
+            throw e;
+        }
+
+        const files = (res && res.files) || [];
+        return files.map(function (f) {
+            const date = Date.parse(f.creationDate || '') || Date.now();
+            let webPath = f.webPath || f.path;
+            if (!f.webPath) {
+                try {
+                    webPath = window.Capacitor.convertFileSrc(f.path);
+                } catch (e) {
+                    // 保留 file:// 路径，让上层报一个明确的读取错误
+                }
+            }
+            if (f.isVideo) {
+                return {
+                    nativePath: f.path,
+                    name: f.name || 'video',
+                    size: f.size || 0,
+                    type: f.type || 'video/quicktime',
+                    lastModified: date
+                };
+            }
+            return {
+                nativePhoto: true,
+                webPath: webPath,
+                name: f.name || 'image.jpg',
+                size: f.size || 0,
+                type: f.type || 'image/jpeg',
+                lastModified: date
+            };
+        });
+    }
+
     /** 把一张相册照片读成 Blob（上传流水线轮到它时才调用） */
     async function readFile(webPath) {
         let lastErr = null;
@@ -243,9 +293,11 @@
         isNative: native,
         platform: (cap && typeof cap.getPlatform === 'function') ? cap.getPlatform() : 'web',
         canPick: canPick,
+        canPickAlbum: canPickAlbum,
         canPickPhotos: canPickPhotos,
         canPickVideos: canPickVideos,
         canUpload: canUpload,
+        pickAlbum: pickAlbum,
         pickPhotos: pickPhotos,
         pickVideos: pickVideos,
         readFile: readFile,

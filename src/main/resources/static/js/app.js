@@ -1385,11 +1385,15 @@ function openPicker(input) {
     const el = typeof input === 'string' ? $(input) : input;
     if (!el) return;
 
-    // 原生壳（Capacitor）里的「照片/视频」走系统 PHPicker：
-    // 点「添加」相册立刻关，文件由 App 在后台取回；
-    // 网页的 <input type="file"> 则要等 iOS 把整批照片导出完才关窗（10 张 2~3 秒）。
-    if (el.id === 'mediaInput' && window.NativeShell && window.NativeShell.canPick()) {
-        return openMediaSheet();
+    // 原生 App：优先用自定义相册（按日期分组、多选、点「添加」立即关）；
+    // 旧安装包没有这个插件时，退回「照片/视频」选择面板。
+    if (el.id === 'mediaInput' && window.NativeShell) {
+        if (window.NativeShell.canPickAlbum && window.NativeShell.canPickAlbum()) {
+            return pickFromNativeAlbum();
+        }
+        if (window.NativeShell.canPick && window.NativeShell.canPick()) {
+            return openMediaSheet();
+        }
     }
 
     pickerOpen = true;
@@ -1415,10 +1419,32 @@ function openMediaSheet() {
     sheet.hidden = false;
 }
 
+/**
+ * 自定义相册导入：相册点「添加」立即关，插件在后台把选中的照片/视频写成临时文件，
+ * 期间显示常驻提示；写完后照片走原压缩流水线，视频交给原生 FileTransfer。
+ */
+async function pickFromNativeAlbum() {
+    const hide = toast('正在从相册导入，请稍候…', { sticky: true });
+    let files = null;
+    try {
+        files = await window.NativeShell.pickAlbum();
+    } catch (err) {
+        const msg = (err && err.message) || String(err || '');
+        if (/denied|没有相册访问权限|权限/i.test(msg)) {
+            toast('请在 设置 → 隐私与安全性 → 照片 里允许「云盘」访问相册');
+            return;
+        }
+        if (!/cancel/i.test(msg)) toast('从相册导入失败：' + (msg || '未知错误'));
+        return;
+    } finally {
+        hide();
+    }
+    if (files && files.length) await uploadFiles(files);
+}
+
 async function pickFromNative(kind) {
     const isVideo = kind === 'video';
-    const pick = isVideo ? window.NativeShell.pickVideos : window.NativeShell.pickPhotos;
-    const hide = toast(isVideo ? '正在从相册导入视频，请稍候…' : '正在从相册导入照片，请稍候…', { sticky: true });
+    const pick = isVideo ? window.NativeShell.pickVideos : window.NativeShell.pickPhotos;    const hide = toast(isVideo ? '正在从相册导入视频，请稍候…' : '正在从相册导入照片，请稍候…', { sticky: true });
     let files = null;
     try {
         files = await pick();

@@ -12,7 +12,8 @@
     "@capacitor/camera": "8.2.6",
     "@capacitor/core": "8.6.0",
     "@capacitor/file-transfer": "2.0.6",
-    "@capacitor/ios": "8.6.0"
+    "@capacitor/ios": "8.6.0",
+    "@cloud-disk/photo-album": "file:native/photo-album"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0"
