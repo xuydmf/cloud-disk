@@ -17,49 +17,49 @@
 | 等待期间用户看到 | 卡住的系统相册 | App 自己的「正在从相册导入…」 |
 | 大视频 | 整段读进 WebView 内存 | 原生 `FileTransfer` 从磁盘直接发，不进 JS |
 
-「上传/预览/列表/回收站」等仍然由服务器上的网页提供，**前端改完不用重新发版**。
+「上传/预览/列表/回收站」仍然用服务器上的接口，但**页面资源已经打包进 App**：
+装好后启动不读服务器网页，只有数据和接口走局域网。代价是：前端改完要重新打包、重新安装，
+不再「改完刷新就生效」。
 
 ## 2. 结构
 
 ```
 package.json                     Capacitor 依赖与脚本
-capacitor.config.json            appId / server.url / iOS 选项
+capacitor.config.json            没有 server.url：加载安装包内的 public/
 ios/                             Xcode 工程（Swift Package Manager，无 Pods）
   App/App/Info.plist             相册/相机/本地网络权限 + ATS
   App/CapApp-SPM/Package.swift   由 cap sync 生成，引用 node_modules 里的插件
-src/main/resources/static/js/native.js   原生桥接层（浏览器里完全禁用）
-src/main/resources/static/js/app.js      接入点：openPicker / prepare / uploadNative
+src/main/resources/static/js/api-bridge.js   跨域 API 桥：绝对地址 + Bearer token
+src/main/resources/static/js/native.js       原生相册 / 原生上传
+src/main/java/.../config/TokenAuthService.java   token（= Spring Session id）鉴权
 ```
 
 依赖：
 
 - `@capacitor/core`、`@capacitor/ios`、`@capacitor/cli` 8.6.0
-- `@capacitor/camera` 8.2.6 —— `chooseFromGallery()` 走 PHPicker，返回 `webPath` / `uri` / `metadata.creationDate`
+- `@capacitor/camera` 8.2.6 —— 照片用 `pickImages()`（系统 PHPicker），视频用 `chooseFromGallery()`
 - `@capacitor/file-transfer` 2.0.6 —— 从原生文件路径直传，带进度事件
 
-## 3. 运行方式（server.url 模式）
+## 3. 运行方式（独立 App + token）
 
-`capacitor.config.json` 里：
+- 页面从 `capacitor://localhost` 加载（`webDir` 里的资源被 `cap sync` 拷进安装包）。
+- 接口地址是绝对的：`api-bridge.js` 里的 `DEFAULT_BASE = http://192.168.3.31:8080`。
+- 从 `capacitor://localhost` 访问 `http://192.168.3.31:8080` 属于跨域，浏览器**不会带会话 cookie**，
+  所以登录响应多给一个 `X-Auth-Token`（就是 Spring Session 的 id）：
+  - `fetch` / `XHR`：自动改成绝对地址 + `Authorization: Bearer <token>`
+  - `<img>` / `<video>`：`mediaUrl()` 拼上 `?token=<token>`
+  - 服务端 `WebMvcConfig` 放行 `/api/**` 的 CORS 并暴露 `X-Auth-Token`
+  - token 存在 `localStorage.cd_auth_token`，30 天滑动过期；退出登录会删服务端会话
+- 换服务器地址：改 `api-bridge.js` 的 `DEFAULT_BASE` → 重新跑 Actions 打包（App 内没有设置页）。
+- 断网时界面能打开，但列表/缩略图/上传会报网络异常，不会白屏。
 
-```json
-"server": { "url": "http://192.168.3.31:8080", "cleartext": true }
-```
-
-App 启动后直接加载这台服务器上的网页：
-
-- 好处：网页更新立即生效；现有代码全是 `/api/...` 相对路径，一行都不用改。
-- 代价：**必须连得到这台服务器**，断网就是白屏；这是「局域网/内网自用」的形态。
-  如果要做离线可用的 App，需要把前端改成使用绝对 API 地址 + 本地资源，工作量另算。
-
-换服务器地址：改 `server.url` → `pnpm exec cap sync ios` → Xcode 重新运行。
-
-## 4. 构建（在 macOS 上）
+## 4. 构建（在 macOS 或 GitHub Actions 上）
 
 前置：macOS、Xcode 16+、Node 20+、pnpm。
 
 ```bash
 pnpm install          # ios/App/CapApp-SPM/Package.swift 引用 node_modules 里的插件，必须先装依赖
-pnpm exec cap sync ios
+pnpm exec cap sync ios   # 把 src/main/resources/static 拷进 ios/App/App/public
 pnpm exec cap open ios
 ```
 
@@ -67,14 +67,13 @@ Xcode 里：
 
 1. 选 `App` target → **Signing & Capabilities** → 选自己的 Team（Bundle ID 默认 `com.example.clouddisk`，可改）。
 2. 选真机运行。首次启动会请求「本地网络」权限（连接局域网服务器需要）。
-3. 打开后登录，点「照片/视频」验证：点「添加」应立即回 App，并出现「正在从相册导入…」。
+3. 打开后登录（走 token，不再依赖 cookie），点「照片/视频」验证：点「添加」应立即回 App。
 
-> 也可以用脚本一键出**未签名** IPA（不需要打开 Xcode 界面）：
-> `bash scripts/build-ios-ipa.sh`，产物在 `build/cloud-disk-unsigned.ipa`。
-> 适合云端 Mac / CI，也适合没有开发者账号、准备用 Sideloadly 侧载的情况。
+> 也可以用脚本一键出**未签名** IPA：`bash scripts/build-ios-ipa.sh`，
+> 产物在 `build/cloud-disk-unsigned.ipa`，Windows 用 Sideloadly 装（见第 9 节）。
+> GitHub Actions 的 workflow 已包含同样的步骤，推送后手动 Run workflow 即可。
 
 > Windows 上 `cap add/sync` 都能跑（生成工程、写 Package.swift、复制资源），只有编译和签名不行。
-> 没有 Mac 的完整方案见第 9 节。
 
 ## 5. 实现了什么
 
@@ -131,19 +130,24 @@ Xcode 里：
 - **原生桥接模拟**（注入假的 Capacitor）：`pickPhotos` 调 `pickImages` 的参数（20 张 / 2560 / q86）、
   照片描述对象（`precompressed`、EXIF 拍摄时间）、`pickVideos` 只选视频、点「照片/视频」弹面板、
   面板「照片」交给 `uploadFiles`、`precompressed` 照片真实上传（跳过 canvas 压缩）—— 9/9 通过。
-- **网页兜底**：没有 Capacitor 时原生层禁用、不弹原生面板、相册按钮仍触发 `<input>`、
-  真实上传一张图并清理 —— 4/4 通过。
+- **独立 App 模式**：静态资源在 8099（模拟 `capacitor://localhost`），接口在 8080；
+  跨域登录拿 token、`/api/auth/current`、列表、缩略图带 `?token=` 能显示、XHR 上传、退出登录清 token —— 6/6 通过。
+- **网页模式**：同源 cookie 登录、无 token、缩略图相对地址、真实上传 —— 4/4 通过。
 
 真机上还需要确认（Windows 无法执行）：
 
-1. 选 10~20 张照片：点「添加」应立即回到 App（相册不再停住），随后出现「正在从相册导入照片…」。
-2. 首次使用会弹照片权限，选「全部照片」；确认面板的张数/日期/大小正确。
-3. 视频上传：进度、完成后库里文件名、可播放；视频这条路的关窗等待仍然存在。
-4. 切后台/锁屏时上传是否中断（见下）。
+1. 装好后登录（token 模式）能否保持，杀 App 重开是否免登录。
+2. 选 10~20 张照片：点「添加」应立即回到 App（相册不再停住），随后出现「正在从相册导入照片…」。
+3. 首次使用会弹照片权限，选「全部照片」；确认面板的张数/日期/大小正确。
+4. 视频上传：进度、完成后库里文件名、可播放；视频这条路的关窗等待仍然存在。
 5. 20 张一批的内存表现（若被杀进程，把 `limit` 调小或分批）。
 
 ## 7. 已知限制 / 下一步
 
+- **独立 App 的代价**：页面在安装包里，**改前端（含 JS/CSS/HTML）必须重新打包、重新安装**，
+  不像原来的网页壳那样改完刷新就生效。原生插件、`api-bridge.js` 的服务器地址同理。
+- **服务器地址是打包时写死的**：`api-bridge.js` 的 `DEFAULT_BASE`。电脑 IP 变了就得改它重新打包；
+  后续可以在 App 里加一个「服务器地址」设置页（存 localStorage）。
 - **照片**：`pickImages` 已经能在点「添加」时立即关窗；但它是 `@capacitor/camera` 的旧接口
   （已标记 deprecated），未来升级插件可能移除。长期方案是写一个自定义 PHPicker 插件：
   选完立即返回文件 token，再按需一张一张 load，彻底避免整批 `UIImage` 驻留内存。
@@ -153,9 +157,9 @@ Xcode 里：
   这一步建议在 Mac 上单独做一轮，且要真机验证。
 - 视频的文件名取决于插件给的临时文件路径；如果它给的是 UUID，库里的名字会不好看。
   后续可以在原生侧复制成目标文件名再传（会多一次磁盘拷贝）。
-- `window.open()`（在线编辑、下载）在 WebView 里和浏览器行为不同，需要的话接 `@capacitor/browser`。
-- App Store 审核风险：这是「网页 + 原生选图/上传」的壳，属于 Guideline 4.2 的灰色地带，
-  适合自用 / TestFlight / 企业分发；公开上架需要补原生功能。
+- `window.open()`（下载）在 WebView 里和浏览器行为不同；在线编辑在原生模式改成同页打开。
+- App Store 审核风险：这是「本地页面 + 原生选图/上传 + 远程 API」的 App，
+  比纯网页壳好一些，但功能仍偏薄，公开上架需要补原生功能。
 - iOS 不允许明文 HTTP：`Info.plist` 里用 `NSAllowsArbitraryLoads` 放行了 ATS（见下）。
   以后上 HTTPS 应收紧成域名白名单。
 
@@ -173,10 +177,9 @@ PHPicker 正常不触发相册权限弹窗；如果弹了，是 Camera 插件为
 
 ## 9. 没有 Mac 怎么办
 
-先说一句：**日常改前端不需要 Mac**。App 加载的是服务器上的网页，改 UI / 逻辑只重启服务器
-（`java -jar target/cloud-disk.jar`）即可；只有原生插件、`Info.plist`、`server.url` 变了才要重新打包。
-
-Mac 只在「把工程编译成 IPA」这一步需要。四条路：
+先说一句：**独立 App 的页面在安装包里，改前端也要重新打包**（不再像网页壳那样刷新生效）。
+所以没有 Mac 时，推荐直接用 GitHub Actions：推代码 → 跑 workflow → 下载 IPA → Sideloadly 覆盖安装，
+登录态和数据都在。Mac 仍然只在「编译 IPA」这一步需要，四条路：
 
 | 路线 | 花钱 | 你还需要 | 安装有效期 |
 |---|---|---|---|
@@ -235,11 +238,11 @@ $99 账号：ad hoc 安装 1 年，或走 TestFlight。
 
 ### 连不上服务器？
 
-`server.url` 是打包时写进 App 的，必须是手机能访问到的地址：
+接口地址是打包时写进 App 的（`api-bridge.js` 的 `DEFAULT_BASE`），必须是手机能访问到的地址：
 
 - 同一 Wi-Fi：直接用 `http://<电脑局域网 IP>:8080`（当前配置 `192.168.3.31`）。
 - 不在同一网络：用 Tailscale / ZeroTier / frp 把服务器的 8080 暴露成一个地址，
-  改 `capacitor.config.json` 的 `server.url`，重新跑一次构建脚本。
+  改 `api-bridge.js` 的 `DEFAULT_BASE`，重新跑一次构建脚本。
 
 ### 不想打包的兜底
 

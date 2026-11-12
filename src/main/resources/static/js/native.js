@@ -216,12 +216,16 @@
             });
         }
         try {
-            // 插件要的是绝对地址（原生 URLSession 不认相对路径）
-            const absolute = new URL(job.url, window.location.href).toString();
+            // 独立 App 里页面在 capacitor://localhost，接口要拼成绝对地址；并带上 token
+            const absolute = (window.apiUrl ? window.apiUrl(job.url) : new URL(job.url, window.location.href).toString());
+            const headers = {};
+            const authToken = (typeof window.getAuthToken === 'function') ? window.getAuthToken() : '';
+            if (authToken) headers.Authorization = 'Bearer ' + authToken;
             const res = await FileTransfer.uploadFile({
                 url: absolute,
                 path: job.path,
                 params: job.params || {},
+                headers: headers,
                 fileKey: 'file',
                 mimeType: job.mimeType || '',
                 chunkedMode: false,

@@ -528,7 +528,7 @@ function renderCard(f) {
 
     if (type === 'IMAGE' || type === 'VIDEO') {
         const img = document.createElement('img');
-        img.src = `/api/files/${f.id}/thumb`;
+        img.src = mediaUrl(`/api/files/${f.id}/thumb`);
         img.loading = 'lazy';
         img.alt = f.fileName;
         img.onerror = () => {
@@ -797,7 +797,7 @@ function showImage(file, attempt) {
     const stage = $('#galleryStage');
     if (!a) return;
 
-    const urls = [`/api/files/${file.id}/preview`, `/api/files/${file.id}/raw`];
+    const urls = [mediaUrl(`/api/files/${file.id}/preview`), mediaUrl(`/api/files/${file.id}/raw`)];
     const url = urls[Math.min(attempt, urls.length - 1)];
     const token = ++imgToken;
 
@@ -856,7 +856,7 @@ function showImage(file, attempt) {
 function prefetchNeighbours() {
     [-1, 1].forEach((d) => {
         const f = galleryList[galleryIndex + d];
-        if (f) preloadImage(`/api/files/${f.id}/preview`);
+        if (f) preloadImage(mediaUrl(`/api/files/${f.id}/preview`));
     });
 }
 
@@ -885,8 +885,8 @@ function playVideo(id) {
     const v = $('#videoPlayer');
     const state = $('#videoState');
     if (state) state.hidden = true;
-    v.dataset.downloadUrl = `/api/files/${id}/download`;
-    v.src = `/api/files/${id}/play`;
+    v.dataset.downloadUrl = mediaUrl(`/api/files/${id}/download`);
+    v.src = mediaUrl(`/api/files/${id}/play`);
     v.load();
     $('#videoModal').hidden = false;
     fitVideoBox();
@@ -919,7 +919,7 @@ function fitVideoBox() {
 }
 
 function downloadFile(id) {
-    window.open(`/api/files/${id}/download`, '_blank');
+    window.open(mediaUrl(`/api/files/${id}/download`), '_blank');
 }
 
 // ---------------- 在线编辑（独立全屏页 editor.html） ----------------
@@ -933,6 +933,11 @@ function canEditFile(f) {
 /** 新开标签页全屏打开编辑器，让用户能像 Excel 一样整页操作 */
 function openFileEditor(f) {
     const url = 'editor.html?id=' + encodeURIComponent(f.id);
+    // 独立 App 里是新开窗口不可用，直接在本 WebView 里打开（编辑器有「返回云盘」链接）
+    if (window.APP_IS_NATIVE) {
+        location.href = url;
+        return;
+    }
     const w = window.open(url, '_blank');
     if (!w) toast('浏览器拦截了新标签页，请允许弹出窗口后重试');
 }
@@ -2519,7 +2524,7 @@ function batchDownloadSelected() {
     if (!ids.length) return;
     if (ids.length > 300) { toast('单次最多打包 300 个文件'); return; }
     // 交给浏览器下载，服务端流式打包为 zip
-    window.open('/api/files/batch/download?ids=' + ids.join(','), '_blank');
+    window.open(mediaUrl('/api/files/batch/download?ids=' + ids.join(',')), '_blank');
     toast(`正在打包 ${ids.length} 个文件…`);
 }
 

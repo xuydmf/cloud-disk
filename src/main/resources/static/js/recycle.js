@@ -160,7 +160,7 @@ function renderRow(f) {
     thumb.className = 'rc-thumb';
     if (f.thumbPath && (f.fileType === 'IMAGE' || f.fileType === 'VIDEO')) {
         const img = document.createElement('img');
-        img.src = `/api/recycle/${f.id}/thumb`;
+        img.src = mediaUrl(`/api/recycle/${f.id}/thumb`);
         img.loading = 'lazy';
         img.alt = f.fileName;
         img.onerror = () => { thumb.innerHTML = extMarkup(f); };
@@ -230,7 +230,7 @@ function mkBtn(label, fn, danger) {
 }
 
 function previewThumb(f) {
-    $('#imagePreview').src = `/api/recycle/${f.id}/preview`;
+    $('#imagePreview').src = mediaUrl(`/api/recycle/${f.id}/preview`);
     $('#imgName').textContent = f.fileName;
     $('#imageModal').hidden = false;
 }

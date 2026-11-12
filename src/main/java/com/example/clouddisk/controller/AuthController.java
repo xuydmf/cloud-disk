@@ -2,6 +2,8 @@ package com.example.clouddisk.controller;
 
 import com.example.clouddisk.common.LoginUser;
 import com.example.clouddisk.common.Result;
+import com.example.clouddisk.config.AuthInterceptor;
+import com.example.clouddisk.config.TokenAuthService;
 import com.example.clouddisk.dto.LoginForm;
 import com.example.clouddisk.dto.PasswordForm;
 import com.example.clouddisk.entity.SysUser;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 
@@ -25,14 +28,17 @@ import javax.validation.Valid;
 public class AuthController {
 
     private final SysUserService sysUserService;
+    private final TokenAuthService tokenAuth;
 
-    public AuthController(SysUserService sysUserService) {
+    public AuthController(SysUserService sysUserService, TokenAuthService tokenAuth) {
         this.sysUserService = sysUserService;
+        this.tokenAuth = tokenAuth;
     }
 
     @PostMapping("/login")
     public Result<LoginUser> login(@RequestBody @Valid LoginForm form,
-                                   HttpServletRequest request) {
+                                   HttpServletRequest request,
+                                   HttpServletResponse response) {
         SysUser user;
         try {
             user = sysUserService.authenticate(form.getUsername(), form.getPassword());
@@ -53,12 +59,19 @@ public class AuthController {
                         ? user.getUsername() : user.getDisplayName(),
                 user.getRole());
         session.setAttribute(LoginUser.SESSION_KEY, loginUser);
+        // 原生 App 的跨域请求拿不到 cookie，用响应头把 session id 交给它当 Bearer token
+        response.setHeader("X-Auth-Token", session.getId());
         // 有效期统一由 application.yml 的 spring.session.timeout 控制，不在这里硬编码
         return Result.success(loginUser);
     }
 
     @PostMapping("/logout")
     public Result<Void> logout(HttpServletRequest request) {
+        // 原生 App：删掉 token 对应的会话
+        String token = tokenAuth.token(request);
+        if (token != null) {
+            tokenAuth.delete(token);
+        }
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
@@ -69,15 +82,22 @@ public class AuthController {
     /** 前端启动时调用：未登录返回 data=null，而不是 401 */
     @GetMapping("/current")
     public Result<LoginUser> current(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        Object v = session == null ? null : session.getAttribute(LoginUser.SESSION_KEY);
+        // 原生 App 的 token 请求会先被拦截器放进 request attribute
+        Object v = request.getAttribute(AuthInterceptor.REQ_LOGIN_USER);
+        if (!(v instanceof LoginUser)) {
+            HttpSession session = request.getSession(false);
+            v = session == null ? null : session.getAttribute(LoginUser.SESSION_KEY);
+        }
+        if (!(v instanceof LoginUser)) {
+            v = tokenAuth.user(request);
+        }
         return Result.success(v instanceof LoginUser ? (LoginUser) v : null);
     }
 
     /** 修改自己的密码 */
     @PostMapping("/password")
     public Result<Void> changePassword(@RequestBody PasswordForm form, HttpServletRequest request) {
-        Object v = request.getAttribute("loginUser");
+        Object v = request.getAttribute(AuthInterceptor.REQ_LOGIN_USER);
         if (!(v instanceof LoginUser)) {
             return Result.error(401, "登录已失效，请重新登录");
         }

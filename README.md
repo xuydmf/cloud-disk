@@ -712,17 +712,18 @@ cloud-disk/
 
 ---
 
-## 十二、iOS App（Capacitor 套壳）
+## 十二、iOS App（Capacitor 独立 App）
 
 网页版在 iPhone 上有一个绕不过去的问题：点「照片/视频」选完照片，**相册要等系统导出完才关**。
 导出（HEIC→JPEG 转码、拷贝、iCloud 原图下载）发生在 `change` 之前，页面一行 JS 都没跑，
 没有 API 能提前关窗。10 张照片大约 2~3 秒。
 
-所以加了一个 Capacitor 壳，把「选图」换成原生 PHPicker，其余（列表 / 预览 / 回收站 / 在线编辑）
-仍然是服务器上的那套网页——**前端改完不用发版**。
+所以做了一个 Capacitor App，**页面资源打包进安装包**（启动不读服务器网页），接口仍走服务器：
 
-真机踩坑：`@capacitor/camera` 的 `chooseFromGallery` 底层是 IONCAMR 自己画的相册，**要等导出完才关窗**。
-现在照片改走 `Camera.pickImages()`（系统 PHPicker），点「添加」立即关；视频仍走原相册（关窗等待还在）。
+- 相册：照片走 `Camera.pickImages()`（系统 PHPicker），点「添加」立即关；视频仍走原相册。
+- 接口：页面在 `capacitor://localhost`，跨域访问服务器不带 cookie，改用
+  `X-Auth-Token`（Spring Session id）+ `Authorization: Bearer`，图片/视频用 `?token=`。
+- 代价：**改前端要重新打包安装**（不再「刷新即生效」）；服务器 IP 写死在 `api-bridge.js`。
 
 | | 网页 `<input type=file>` | App |
 |---|---|---|
@@ -731,6 +732,8 @@ cloud-disk/
 | 等待期间 | 卡住的系统相册 | App 的「正在从相册导入…」 |
 | 照片上传 | Blob → 压缩 → XHR | 原生缩到 2560/q86 → 按需读取 → 上传 |
 | 视频上传 | 整段进 WebView 内存 | 原生 `FileTransfer` 从磁盘直传，不进 JS |
+| 启动 | 打开网页 | 本地页面，秒开；断网时列表/上传不可用 |
+| 更新 | 刷新即生效 | 重新 Actions 打包 + 重装 |
 
 原生壳里点「照片/视频」会先弹一个「照片 / 视频」选择面板；照片一次最多 20 张，
 首次使用要允许「访问所有照片」（「有限访问」会被插件拒绝）。
@@ -739,12 +742,14 @@ cloud-disk/
 
 | 位置 | 作用 |
 |------|------|
+| `static/js/api-bridge.js` | 跨域 API 桥：绝对地址 + Bearer token；网页里原样不动 |
 | `static/js/native.js` | 桥接层：`pickPhotos`（PHPicker）/ `pickVideos` / `readFile` / `upload`（FileTransfer） |
-| `app.js#openPicker` | 相册按钮在原生壳里打开 `#mediaSheet` 选择面板 |
+| `app.js#openPicker` | 相册按钮在原生 App 里打开 `#mediaSheet` 选择面板 |
 | `app.js#prepare` | `precompressed` 照片跳过 canvas 压缩；视频保留 `nativePath` |
 | `app.js#uploadNative` | 原生直传，重试 / 重复 / 401 语义与网页直传一致 |
+| `config/TokenAuthService.java` | token 鉴权（复用 Spring Session，30 天滑动过期） |
 
-构建（**编译需要 macOS + Xcode**；日常改前端不用重新打包，App 加载的是服务器网页）：
+构建（**编译需要 macOS + Xcode**；改前端后必须重新打包）：
 
 ```bash
 pnpm install
@@ -757,8 +762,9 @@ pnpm exec cap open ios
 四条路线的成本与步骤见 [docs/native-app.md#9-没有-mac-怎么办](docs/native-app.md#9-没有-mac-怎么办)。
 CI workflow 在 `.github/workflows/ios-unsigned.yml`（需要把仓库镜像到 GitHub）。
 
-`capacitor.config.json` 里 `server.url` 指向 `http://192.168.3.31:8080`（局域网自用形态，断网白屏）。
-权限、ATS、验证清单、已知限制（后台续传未做、App Store 4.2）见
+`capacitor.config.json` 不再配置 `server.url`；接口地址在
+[static/js/api-bridge.js](src/main/resources/static/js/api-bridge.js) 的 `DEFAULT_BASE`
+（当前 `http://192.168.3.31:8080`）。权限、CORS/token、验证清单、已知限制（后台续传未做、每次改前端要重打包）见
 [docs/native-app.md](docs/native-app.md)。
 
 ---

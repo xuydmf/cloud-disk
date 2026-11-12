@@ -3,6 +3,7 @@ package com.example.clouddisk.config;
 import com.example.clouddisk.service.SysUserService;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.CacheControl;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -17,14 +18,16 @@ import java.util.concurrent.TimeUnit;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final SysUserService sysUserService;
+    private final TokenAuthService tokenAuth;
 
-    public WebMvcConfig(SysUserService sysUserService) {
+    public WebMvcConfig(SysUserService sysUserService, TokenAuthService tokenAuth) {
         this.sysUserService = sysUserService;
+        this.tokenAuth = tokenAuth;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new AuthInterceptor(sysUserService))
+        registry.addInterceptor(new AuthInterceptor(sysUserService, tokenAuth))
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
                         "/api/auth/login",
@@ -37,6 +40,22 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         registry.addInterceptor(new PageAuthInterceptor())
                 .addPathPatterns("/", "/index.html", "/admin.html", "/editor.html");
+    }
+
+    /**
+     * 原生 App 的页面从 capacitor://localhost 加载，访问 http://服务器:8080 属于跨域。
+     * 凭据走 Authorization token（不是 cookie），所以 allowCredentials 关掉、源放通。
+     * 图片/视频用 ?token=，不需要 CORS；fetch / XHR 需要这里的放行。
+     */
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOriginPatterns("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .exposedHeaders("X-Auth-Token")
+                .allowCredentials(false)
+                .maxAge(3600);
     }
 
     /**
