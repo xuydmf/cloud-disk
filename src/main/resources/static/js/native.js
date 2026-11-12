@@ -23,18 +23,12 @@
     const Camera = plugins.Camera || null;
     const FileTransfer = plugins.FileTransfer || null;
 
-    const IMAGE_MIME = {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
-        heic: 'image/heic', heif: 'image/heif', webp: 'image/webp',
-        tif: 'image/tiff', tiff: 'image/tiff', bmp: 'image/bmp'
-    };
     const VIDEO_MIME = {
         mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/x-m4v',
         '3gp': 'video/3gpp', webm: 'video/webm', avi: 'video/x-msvideo'
     };
 
-    // 与原生枚举对应：MediaTypeSelection.Photo=0 / Video=1 / All=2
-    const MEDIA_ALL = 2;
+    // 与原生枚举对应：MediaTypeSelection.Video = 1
     const MEDIA_VIDEO = 1;
 
     function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -80,32 +74,56 @@
         }
     }
 
-    function canPick() {
+    function canPickPhotos() {
+        // 注意：用的是旧接口 pickImages，不是 chooseFromGallery。
+        // chooseFromGallery 底层是 IONCAMR 自己画的相册，它会等所有照片导出完才 dismiss，
+        // 真机上仍然"关得很慢"；pickImages 走系统 PHPicker，点「完成」立即关窗，回调异步。
+        return native && !!Camera && typeof Camera.pickImages === 'function';
+    }
+
+    function canPickVideos() {
         return native && !!Camera && typeof Camera.chooseFromGallery === 'function';
+    }
+
+    function canPick() {
+        return canPickPhotos() || canPickVideos();
     }
 
     function canUpload() {
         return native && !!FileTransfer && typeof FileTransfer.uploadFile === 'function';
     }
 
-    /**
-     * 打开系统相册（PHPicker）。返回的是「描述对象」而不是 File：
-     *   · 照片 { nativePhoto: true, webPath, name, size, type, lastModified }
-     *     不上来就读进内存——20 张 12MP 照片就是 60MB Blob，WKWebView 会吃紧。
-     *     等上传流水线真正轮到它时，再 readFile() 一张一张读。
-     *   · 视频 { nativePath, name, size, type, lastModified }
-     *     视频可能有几百 MB，永远不进 JS 内存，直接交给原生 FileTransfer 从磁盘发。
-     */
-    async function pickMedia() {
-        if (!canPick()) return [];
+    /** EXIF 的 DateTimeOriginal（"2026:09:20 18:30:00"）→ Date */
+    function exifDate(exif) {
+        if (!exif) return null;
+        const raw = exif.DateTimeOriginal || exif.DateTimeDigitized;
+        const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(raw || ''));
+        if (!m) return null;
+        const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+        return isNaN(d.getTime()) ? null : d;
+    }
 
+    /**
+     * 照片：系统 PHPicker（pickImages）。点「完成」立即关窗，随后在 App 里处理。
+     *
+     * 原生侧同时做了两件事：
+     *   · 按 width/height = 2560 等比缩到长边 2560（和网页 shrinkImage 的规格一致）
+     *   · 按 quality 86 编码成 JPEG
+     * 所以描述对象带 precompressed: true，上传流水线不再重复压缩。
+     *
+     * 描述对象不读字节：等流水线轮到它时再 readFile() 一张一张读，
+     * 避免 20 张照片一次性变成 60MB Blob。
+     */
+    async function pickPhotos() {
+        if (!canPickPhotos()) return [];
         let res;
         try {
-            res = await Camera.chooseFromGallery({
-                mediaType: MEDIA_ALL,
-                allowMultipleSelection: true,
-                limit: 0,              // 0 = 不限张数
-                includeMetadata: true
+            res = await Camera.pickImages({
+                limit: 20,             // 一次最多 20 张：原生侧会把整批解码后的图留在内存里
+                width: 2560,
+                height: 2560,
+                quality: 86,
+                correctOrientation: true
             });
         } catch (e) {
             // 用户点「取消」不是错误
@@ -113,41 +131,59 @@
             throw e;
         }
 
-        const items = (res && res.results) || [];
+        const photos = (res && res.photos) || [];
         const nextName = nameMaker();
-
-        return items.map(function (item) {
-            const isVideo = item.type === MEDIA_VIDEO || item.type === 'video';
-            const meta = item.metadata || {};
-            const ext = extOf(meta.format, isVideo);
-            const mime = (isVideo ? VIDEO_MIME : IMAGE_MIME)[ext] || (isVideo ? 'video/mp4' : 'image/jpeg');
-            const date = dateOf(meta.creationDate);
-
-            if (isVideo) {
-                // 文件名：FileTransfer 用的是原生路径的文件名，这里跟着它走，避免
-                // 「确认面板显示 A、库里变成 B」。取不到就用生成的名字。
-                const base = basename(item.uri || item.webPath);
-                const name = (base && /\.[a-z0-9]{2,5}$/i.test(base)) ? base : nextName('VID', date, ext);
-                return {
-                    nativePath: item.uri,
-                    name: name,
-                    size: meta.size || 0,
-                    type: mime,
-                    lastModified: date.getTime()
-                };
-            }
-
+        return photos.map(function (p) {
+            const date = exifDate(p.exif) || new Date();
             return {
                 nativePhoto: true,
-                webPath: item.webPath,
-                name: nextName('IMG', date, ext),
+                precompressed: true,
+                webPath: p.webPath,
+                name: nextName('IMG', date, 'jpg'),
+                size: 0,                    // 原生没回大小；流水线读到 Blob 后补上
+                type: 'image/jpeg',
+                lastModified: date.getTime()
+            };
+        }).filter(function (f) { return !!f.webPath; });
+    }
+
+    /**
+     * 视频：只能走 chooseFromGallery（IONCAMR 的相册）。它在关窗前要把视频导出，
+     * 所以视频的关窗速度仍由系统决定；照片已经不受影响了。
+     */
+    async function pickVideos() {
+        if (!canPickVideos()) return [];
+        let res;
+        try {
+            res = await Camera.chooseFromGallery({
+                mediaType: MEDIA_VIDEO,
+                allowMultipleSelection: true,
+                limit: 0,
+                includeMetadata: true
+            });
+        } catch (e) {
+            if (/cancel/i.test((e && e.message) || '')) return [];
+            throw e;
+        }
+
+        const items = (res && res.results) || [];
+        const nextName = nameMaker();
+        return items.map(function (item) {
+            const meta = item.metadata || {};
+            const ext = extOf(meta.format, true);
+            const mime = VIDEO_MIME[ext] || 'video/quicktime';
+            const date = dateOf(meta.creationDate);
+            // FileTransfer 用原生路径的文件名，这里跟着它走，避免「面板显示 A、库里变成 B」
+            const base = basename(item.uri || item.webPath);
+            const name = (base && /\.[a-z0-9]{2,5}$/i.test(base)) ? base : nextName('VID', date, ext);
+            return {
+                nativePath: item.uri,
+                name: name,
                 size: meta.size || 0,
                 type: mime,
                 lastModified: date.getTime()
             };
-        }).filter(function (f) {
-            return (f.nativePhoto && f.webPath) || (f.nativePath && String(f.nativePath).length > 0);
-        });
+        }).filter(function (f) { return f.nativePath && String(f.nativePath).length > 0; });
     }
 
     /** 把一张相册照片读成 Blob（上传流水线轮到它时才调用） */
@@ -203,8 +239,11 @@
         isNative: native,
         platform: (cap && typeof cap.getPlatform === 'function') ? cap.getPlatform() : 'web',
         canPick: canPick,
+        canPickPhotos: canPickPhotos,
+        canPickVideos: canPickVideos,
         canUpload: canUpload,
-        pickMedia: pickMedia,
+        pickPhotos: pickPhotos,
+        pickVideos: pickVideos,
         readFile: readFile,
         upload: upload
     };

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <title>云盘 · 文件工作台</title>
-<link rel="stylesheet" href="css/style.css?v=20261110a">
+<link rel="stylesheet" href="css/style.css?v=20261112a">
 </head>
 <body data-view="grid">
 
@@ -299,6 +299,31 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<!-- ============ 从相册导入：照片 / 视频 ============ -->
+<div class="modal" id="mediaSheet" hidden>
+    <div class="modal-mask" data-close="mediaSheet"></div>
+    <div class="modal-body modal-panel">
+        <div class="m-head">
+            <p class="m-eyebrow">Import</p>
+            <h3 class="modal-title">从相册导入</h3>
+            <p class="modal-sub">照片：点「添加」后相册立即关闭</p>
+            <button class="modal-close" type="button" data-close="mediaSheet" aria-label="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+        <div class="m-body">
+            <div class="group-list">
+                <button class="group-item" id="mediaPickPhotos" type="button">
+                    <span>照片</span><em>快速</em>
+                </button>
+                <button class="group-item" id="mediaPickVideos" type="button">
+                    <span>视频</span><em>相册</em>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 隐藏的文件选择控件。不用 hidden / display:none：那样在部分 WebView 里点不动。
      用 CSS 移出视口，iOS 点开时也不会引起页面重排。 -->
 <input type="file" id="fileInput" multiple
@@ -310,7 +335,7 @@
 
 <script src="js/edit-types.js"></script>
 <script src="js/dialog.js"></script>
-<script src="js/native.js?v=20261110b"></script>
-<script src="js/app.js?v=20261110b"></script>
+<script src="js/native.js?v=20261112a"></script>
+<script src="js/app.js?v=20261112a"></script>
 </body>
 </html>

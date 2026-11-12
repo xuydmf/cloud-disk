@@ -80,19 +80,39 @@ Xcode 里：
 
 ### 5.1 原生选图（`native.js` + `openPicker`）
 
-- 仅当 `window.Capacitor.isNativePlatform()` 且 `Camera.chooseFromGallery` 存在时启用；
-  浏览器里 `NativeShell.canPick() === false`，相册按钮仍然走原来的 `<input type="file">`。
-- 调用 `chooseFromGallery({ allowMultipleSelection: true, limit: 0, includeMetadata: true })`。
-- 返回两类「描述对象」，都不直接变成 File：
-  - 照片 `{ nativePhoto, webPath, name, size, type, lastModified }`
-  - 视频 `{ nativePath, name, size, type, lastModified }`
-- 文件名由拍摄时间生成：`IMG_20260920_183000.jpg`（同一秒多张自动加 `_2`）；视频优先用原生路径的文件名，
-  保证确认面板和库里显示一致。
+真机验证发现：`@capacitor/camera` 的 `chooseFromGallery` **底层不是 PHPicker**，而是 IONCAMR
+自己画的相册（`PHAsset` + 自定义界面）。它要等所有照片导出完才 `dismiss`，所以点「添加」后
+相册仍然卡几秒——和网页版一样，原生壳并没有解决。
+
+现在的分工：
+
+| 类型 | 接口 | 关窗速度 |
+|---|---|---|
+| 照片 | `Camera.pickImages()`（系统 PHPicker） | **点「添加」立即关**，回调异步 |
+| 视频 | `Camera.chooseFromGallery()`（IONCAMR 相册） | 仍要等导出（视频少、体积大，暂时接受） |
+
+- 仅当 `window.Capacitor.isNativePlatform()` 时启用；浏览器里 `NativeShell.canPickPhotos() === false`，
+  相册按钮仍然走原来的 `<input type="file">`。
+- 原生壳里点「照片/视频」先弹一个小面板选「照片 / 视频」（`#mediaSheet`）：
+  - 照片：`pickImages({ limit: 20, width: 2560, height: 2560, quality: 86 })`
+    —— 原生侧按长边 2560 / q86 缩好，返回临时 JPEG 的 `webPath`；
+    描述对象 `{ nativePhoto: true, precompressed: true, webPath, name, size, type, lastModified }`，
+    上传流水线不再用 canvas 压第二次。
+  - 视频：`chooseFromGallery({ mediaType: Video, allowMultipleSelection: true })`，
+    描述对象 `{ nativePath, name, size, type, lastModified }`。
+- `pickImages` 在 iOS 上会先要「照片」权限，**必须选「允许访问所有照片」**；选「有限访问」插件会拒绝，
+  前端会提示去 设置 → 隐私与安全性 → 照片 改权限。
+- 一次最多 20 张：PHPicker 回调里会把整批解码后的 `UIImage` 攒在内存里（每张 2560 长边约 20 MB），
+  再往上加有被 iOS 杀进程的风险；更多请分批选。
+- 文件名由拍摄时间生成：`IMG_20260920_183000.jpg`（同一秒多张自动加 `_2`），拍摄时间优先取 EXIF
+  `DateTimeOriginal`；视频优先用原生路径的文件名，保证确认面板和库里一致。
 
 ### 5.2 照片按需读取
 
-上传流水线轮到某一张照片时才 `fetch(webPath)` 读成 Blob，再走原来的压缩逻辑。
-不会把整批 20 张先变成 60 MB Blob 压在 WKWebView 里；内存峰值约等于并发数。
+上传流水线轮到某一张照片时才 `fetch(webPath)` 读成 Blob（一次一张，内存峰值约等于并发数）。
+照片已经在原生侧缩到 2560 / q86，所以 `prepare()` 直接返回、跳过 canvas 压缩。
+
+> 代价：原生照片固定是 2560 的 JPEG，工具栏的「上传原图」开关对原生选图不生效。
 
 ### 5.3 视频原生直传
 
@@ -108,21 +128,26 @@ Xcode 里：
 
 已在 Windows + Chrome（CDP）里完成：
 
-- **原生桥接模拟**（注入假的 Capacitor）：`pickMedia` 参数与返回、照片描述对象、视频描述对象、
-  `readFile`、`upload` 的 multipart/查询参数/进度/监听器清理、`uploadNative` 的 code=0 / code=2 / addSent、
-  `openPicker` 走原生分支并交给 `uploadFiles` —— 9/9 通过。
-- **网页兜底**：没有 Capacitor 时原生层禁用、相册按钮仍触发 `<input>`、真实上传一张图并清理 —— 4/4 通过。
+- **原生桥接模拟**（注入假的 Capacitor）：`pickPhotos` 调 `pickImages` 的参数（20 张 / 2560 / q86）、
+  照片描述对象（`precompressed`、EXIF 拍摄时间）、`pickVideos` 只选视频、点「照片/视频」弹面板、
+  面板「照片」交给 `uploadFiles`、`precompressed` 照片真实上传（跳过 canvas 压缩）—— 9/9 通过。
+- **网页兜底**：没有 Capacitor 时原生层禁用、不弹原生面板、相册按钮仍触发 `<input>`、
+  真实上传一张图并清理 —— 4/4 通过。
 
 真机上还需要确认（Windows 无法执行）：
 
-1. 选 10~20 张：点「添加」到回到 App 的时间（应≈立即），以及「正在从相册导入…」出现多久。
-2. 导入完成后确认面板的张数/日期/大小是否正确（`creationDate` 决定按天分组）。
-3. 视频上传：进度、完成后库里文件名、可播放。
+1. 选 10~20 张照片：点「添加」应立即回到 App（相册不再停住），随后出现「正在从相册导入照片…」。
+2. 首次使用会弹照片权限，选「全部照片」；确认面板的张数/日期/大小正确。
+3. 视频上传：进度、完成后库里文件名、可播放；视频这条路的关窗等待仍然存在。
 4. 切后台/锁屏时上传是否中断（见下）。
-5. `server.url` 换成本机实际 IP 后能否登录（cookie 持久化）。
+5. 20 张一批的内存表现（若被杀进程，把 `limit` 调小或分批）。
 
 ## 7. 已知限制 / 下一步
 
+- **照片**：`pickImages` 已经能在点「添加」时立即关窗；但它是 `@capacitor/camera` 的旧接口
+  （已标记 deprecated），未来升级插件可能移除。长期方案是写一个自定义 PHPicker 插件：
+  选完立即返回文件 token，再按需一张一张 load，彻底避免整批 `UIImage` 驻留内存。
+- **视频**：仍走 IONCAMR 相册，关窗前要导出，几秒钟的等待仍然存在；要彻底解决同样需要自定义插件。
 - **真正的后台上传没有做**：`@capacitor/file-transfer` 是前台 URLSession，App 切后台会被 iOS 挂起。
   要「锁屏也继续传」需要自定义 Swift 插件（background `URLSessionConfiguration` + AppDelegate 回调），
   这一步建议在 Mac 上单独做一轮，且要真机验证。

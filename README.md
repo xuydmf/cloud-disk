@@ -721,20 +721,27 @@ cloud-disk/
 所以加了一个 Capacitor 壳，把「选图」换成原生 PHPicker，其余（列表 / 预览 / 回收站 / 在线编辑）
 仍然是服务器上的那套网页——**前端改完不用发版**。
 
+真机踩坑：`@capacitor/camera` 的 `chooseFromGallery` 底层是 IONCAMR 自己画的相册，**要等导出完才关窗**。
+现在照片改走 `Camera.pickImages()`（系统 PHPicker），点「添加」立即关；视频仍走原相册（关窗等待还在）。
+
 | | 网页 `<input type=file>` | App |
 |---|---|---|
-| 点「添加」后关窗 | 等系统导出完（10 张 ≈ 2~3 s） | **立即关** |
+| 照片关窗 | 等系统导出完（10 张 ≈ 2~3 s） | **立即关**（`pickImages` + PHPicker） |
+| 视频关窗 | 等系统导出完 | 仍要等（IONCAMR 相册，暂时接受） |
 | 等待期间 | 卡住的系统相册 | App 的「正在从相册导入…」 |
-| 照片上传 | Blob → 压缩 → XHR | 按需读取 → 同一套压缩/上传 |
+| 照片上传 | Blob → 压缩 → XHR | 原生缩到 2560/q86 → 按需读取 → 上传 |
 | 视频上传 | 整段进 WebView 内存 | 原生 `FileTransfer` 从磁盘直传，不进 JS |
 
-接入点都在前端，浏览器里自动禁用（`NativeShell.canPick() === false`），PC / 手机浏览器行为不变：
+原生壳里点「照片/视频」会先弹一个「照片 / 视频」选择面板；照片一次最多 20 张，
+首次使用要允许「访问所有照片」（「有限访问」会被插件拒绝）。
+
+接入点都在前端，浏览器里自动禁用（`NativeShell.canPickPhotos() === false`），PC / 手机浏览器行为不变：
 
 | 位置 | 作用 |
 |------|------|
-| `static/js/native.js` | 桥接层：`pickMedia`（PHPicker）/ `readFile` / `upload`（FileTransfer） |
-| `app.js#openPicker` | 相册按钮在原生壳里改走 `pickFromNativeGallery()` |
-| `app.js#prepare` | 照片轮到时才读字节；视频保留 `nativePath` |
+| `static/js/native.js` | 桥接层：`pickPhotos`（PHPicker）/ `pickVideos` / `readFile` / `upload`（FileTransfer） |
+| `app.js#openPicker` | 相册按钮在原生壳里打开 `#mediaSheet` 选择面板 |
+| `app.js#prepare` | `precompressed` 照片跳过 canvas 压缩；视频保留 `nativePath` |
 | `app.js#uploadNative` | 原生直传，重试 / 重复 / 401 语义与网页直传一致 |
 
 构建（**编译需要 macOS + Xcode**；日常改前端不用重新打包，App 加载的是服务器网页）：

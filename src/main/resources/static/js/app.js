@@ -1384,7 +1384,7 @@ function openPicker(input) {
     // 点「添加」相册立刻关，文件由 App 在后台取回；
     // 网页的 <input type="file"> 则要等 iOS 把整批照片导出完才关窗（10 张 2~3 秒）。
     if (el.id === 'mediaInput' && window.NativeShell && window.NativeShell.canPick()) {
-        return pickFromNativeGallery();
+        return openMediaSheet();
     }
 
     pickerOpen = true;
@@ -1398,19 +1398,33 @@ function openPicker(input) {
 }
 
 /**
- * 原生相册导入。
+ * 原生壳里点「照片/视频」：先让用户选「照片」还是一段视频。
  *
- * 相册关掉之后、文件取回来之前，页面是可见的（不像网页版被系统相册整个盖住），
- * 所以这里给一条常驻提示——用户知道「已经点了添加，正在导入」，而不是以为没反应。
+ * 照片走 PHPicker（pickImages）：点「添加」相册立刻关，原生缩到 2560 再交给我们；
+ * 视频仍走系统相册（chooseFromGallery）：IONCAMR 会在关窗前把视频导出，所以视频
+ * 这一段还是要等——但日常传照片不再等。
  */
-async function pickFromNativeGallery() {
-    const hide = toast('正在从相册导入，请稍候…', { sticky: true });
+function openMediaSheet() {
+    const sheet = $('#mediaSheet');
+    if (!sheet) return;
+    sheet.hidden = false;
+}
+
+async function pickFromNative(kind) {
+    const isVideo = kind === 'video';
+    const pick = isVideo ? window.NativeShell.pickVideos : window.NativeShell.pickPhotos;
+    const hide = toast(isVideo ? '正在从相册导入视频，请稍候…' : '正在从相册导入照片，请稍候…', { sticky: true });
     let files = null;
     try {
-        files = await window.NativeShell.pickMedia();
+        files = await pick();
     } catch (err) {
         const msg = (err && err.message) || String(err || '');
-        if (!/cancel/i.test(msg)) toast('从相册导入失败：' + (msg || '未知错误'));
+        if (/denied access to photos/i.test(msg)) {
+            // pickImages 要求「全部照片」权限；用户选了「有限访问」时插件会拒绝
+            toast('请在 设置 → 隐私与安全性 → 照片 里把「云盘」改成「全部照片」');
+            return;
+        }
+        if (!/cancel/i.test(msg)) toast((isVideo ? '视频' : '照片') + '导入失败：' + (msg || '未知错误'));
         return;
     } finally {
         hide();
@@ -1474,7 +1488,7 @@ function confirmUploadBatch(files) {
         name.textContent = r.f.name || '文件';
         const meta = document.createElement('span');
         meta.className = 'sheet-meta';
-        meta.textContent = formatSize(r.f.size);
+        meta.textContent = r.f.size ? formatSize(r.f.size) : '—';
         const state = document.createElement('span');
         state.className = 'sheet-state';
         state.textContent = '';
@@ -1506,9 +1520,11 @@ function confirmUploadBatch(files) {
         const existsN = rows.filter((r) => r.exists).length;
         const title = `${rows.length} 项`;
         titleEl.textContent = '本次选择 · ' + title;
+        const totalSize = rows.reduce((s, r) => s + (r.f.size || 0), 0);
+        const unknownSize = rows.some((r) => !r.f.size);
         subEl.textContent = existsN
             ? `其中 ${existsN} 项已在库里，已替你取消勾选`
-            : `${formatSize(rows.reduce((s, r) => s + (r.f.size || 0), 0))} · 点「开始上传」立即开始`;
+            : `${unknownSize ? '大小待读取' : formatSize(totalSize)} · 点「开始上传」立即开始`;
         startBtn.textContent = picked.length ? `开始上传 ${picked.length} 项` : '没有可上传的';
         startBtn.disabled = picked.length === 0;
     }
@@ -1677,6 +1693,24 @@ async function doUpload(fileList) {
                 type: item.f.type || '',
                 lastModified: item.f.lastModified || 0
             };
+        }
+
+        // 照片（PHPicker pickImages）：原生已经按长边 2560 / q86 缩好，
+        // 这里只把字节读进来，不再用 canvas 压第二次。
+        if (item.f && item.f.precompressed) {
+            st.label = '读取 ' + (item.f.name || '');
+            ctx.paint();
+            const blob = await window.NativeShell.readFile(item.f.webPath);
+            const file = new File([blob], item.f.name || 'image.jpg', {
+                type: 'image/jpeg',
+                lastModified: item.f.lastModified || Date.now()
+            });
+            if (file.size !== item.size) {
+                ctx.addTotal(file.size - item.size);
+                item.size = file.size;
+            }
+            item.f = file;
+            return { blob: file, name: file.name, size: file.size, type: 'image/jpeg', precompressed: true };
         }
 
         // 原生相册的照片：轮到它时才读进内存。一次只读一张，
@@ -2603,6 +2637,22 @@ if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
         mediaBtn.style.display = '';
         mediaBtn.onclick = () => openPicker('#mediaInput');
     }
+}
+
+// 原生壳的「照片 / 视频」选择面板（浏览器里不会出现）
+const pickPhotosBtn = $('#mediaPickPhotos');
+if (pickPhotosBtn) {
+    pickPhotosBtn.onclick = () => {
+        closeModal('mediaSheet');
+        pickFromNative('photo');
+    };
+}
+const pickVideosBtn = $('#mediaPickVideos');
+if (pickVideosBtn) {
+    pickVideosBtn.onclick = () => {
+        closeModal('mediaSheet');
+        pickFromNative('video');
+    };
 }
 
 $('#viewGrid').onclick = () => setView('grid');
