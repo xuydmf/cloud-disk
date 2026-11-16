@@ -303,7 +303,8 @@ extension PhotoAlbumViewController: UICollectionViewDataSource, UICollectionView
         if let cell = collectionView.cellForItem(at: indexPath) as? PhotoAlbumCell {
             cell.setSelected(selectedIDs.contains(asset.localIdentifier))
         }
-        updateBar()    }
+        updateBar()
+    }
 }
 
 // MARK: - Cell

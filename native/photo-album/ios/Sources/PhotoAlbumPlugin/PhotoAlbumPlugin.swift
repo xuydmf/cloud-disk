@@ -120,13 +120,14 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 // 补上 webPath：JS 里 <img>/fetch 不能直接读 file://
                 var output: [[String: Any]] = []
-                for var file in files {
+                for file in files {
+                    var item = file
                     if let path = file["path"] as? String,
                        let url = URL(string: path),
                        let web = self.bridge?.portablePath(fromLocalURL: url) {
-                        file["webPath"] = web.absoluteString
+                        item["webPath"] = web.absoluteString
                     }
-                    output.append(file)
+                    output.append(item)
                 }
                 call.resolve(["files": output])
             }
