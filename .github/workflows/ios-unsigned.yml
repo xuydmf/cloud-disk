@@ -5,6 +5,9 @@
 #   3. 下载 Artifacts 里的 cloud-disk-unsigned-ipa，用 Sideloadly 安装
 name: iOS 未签名 IPA
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -30,7 +33,22 @@ jobs:
           cache: pnpm
 
       - name: 构建 IPA
-        run: bash scripts/build-ios-ipa.sh
+        run: |
+          set -o pipefail
+          bash scripts/build-ios-ipa.sh 2>&1 | tee /tmp/ios-build.log
+
+      # 失败时把日志推到 ci-log 分支，方便没有 Mac / 没登录 GitHub 的协作者直接看错误
+      - name: 保存失败日志
+        if: failure()
+        run: |
+          mkdir -p ci-log
+          tail -n 800 /tmp/ios-build.log > ci-log/ios-build-error.txt || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-log
+          git add ci-log/ios-build-error.txt
+          git commit -m "ci: iOS build error [skip ci]" || true
+          git push -f origin ci-log
 
       - uses: actions/upload-artifact@v4
         with:

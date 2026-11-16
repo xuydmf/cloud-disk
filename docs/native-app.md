@@ -71,7 +71,7 @@ Xcode 里：
 
 > 也可以用脚本一键出**未签名** IPA：`bash scripts/build-ios-ipa.sh`，
 > 产物在 `build/cloud-disk-unsigned.ipa`，Windows 用 Sideloadly 装（见第 9 节）。
-> GitHub Actions 的 workflow 已包含同样的步骤，推送后手动 Run workflow 即可。
+> GitHub Actions 的 workflow 已包含同样的步骤：推 `main` 自动构建，也可手动 Run workflow。
 
 > Windows 上 `cap add/sync` 都能跑（生成工程、写 Package.swift、复制资源），只有编译和签名不行。
 
@@ -203,7 +203,8 @@ git remote add github git@github.com:<你的账号>/cloud-disk.git
 git push github master
 ```
 
-然后在 GitHub 的 Actions 页面手动运行 **「iOS 未签名 IPA」**（或推一个 `ios-*` 标签），
+然后在 GitHub 的 Actions 页面运行 **「iOS 未签名 IPA」**：推 `main` 会自动构建，
+也可以手动 Run workflow 或推一个 `ios-*` 标签；
 构建完在 Artifacts 里下载 `cloud-disk-unsigned-ipa`，解压就是 ipa。
 
 > 公开仓库的 macOS runner 免费；私有仓库按 10 倍分钟计费，一次构建约 5~10 分钟。
