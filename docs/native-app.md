@@ -124,8 +124,8 @@ Xcode 里：
   跨域登录拿 token、`/api/auth/current`、列表、缩略图带 `?token=` 能显示、XHR 上传、退出登录清 token —— 6/6 通过。
 - **网页模式**：同源 cookie 登录、无 token、缩略图相对地址、真实上传 —— 4/4 通过。
 
-> Swift 相册插件本身只能在 macOS / GitHub Actions 上编译，Windows 无法本地验证；
-> 第一次跑 workflow 时重点看 `PhotoAlbumPlugin` 的编译日志。
+> Swift 相册插件已在 GitHub Actions 编译通过（run `43881311903`，2026-11-16，commit `ea9b860`）；
+> 真机上的相册/上传行为还需要按下面清单验证。
 
 真机上还需要确认（Windows 无法执行）：
 
@@ -209,6 +209,7 @@ git push github master
 
 > 公开仓库的 macOS runner 免费；私有仓库按 10 倍分钟计费，一次构建约 5~10 分钟。
 > workflow 在 `.github/workflows/ios-unsigned.yml`，底层就是 `scripts/build-ios-ipa.sh`。
+> 构建失败时会自动把最后 800 行日志推到 `ci-log` 分支，方便没有 Mac 时排查。
 
 ### 路线 C：Codemagic / Ionic Appflow + TestFlight（完全不碰 Mac）
 

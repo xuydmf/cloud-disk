@@ -761,7 +761,8 @@ pnpm exec cap open ios
 没有 Mac 也能出包：`bash scripts/build-ios-ipa.sh` 在云端 Mac / GitHub Actions 上产出
 **未签名 IPA**，Windows 用 Sideloadly / AltStore 重签安装（免费账号 7 天，$99 账号走 TestFlight）。
 四条路线的成本与步骤见 [docs/native-app.md#9-没有-mac-怎么办](docs/native-app.md#9-没有-mac-怎么办)。
-CI workflow 在 `.github/workflows/ios-unsigned.yml`：推 `main` 自动构建，也可手动 Run workflow。
+CI workflow 在 `.github/workflows/ios-unsigned.yml`：推 `main` 自动构建，也可手动 Run workflow；
+失败时会把最后 800 行日志推到 `ci-log` 分支。Swift 相册插件已编译通过（run `43881311903`）。
 
 `capacitor.config.json` 不再配置 `server.url`；接口地址在
 [static/js/api-bridge.js](src/main/resources/static/js/api-bridge.js) 的 `DEFAULT_BASE`
