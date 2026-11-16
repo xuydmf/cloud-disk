@@ -28,11 +28,11 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
     private var call: CAPPluginCall?
     private var album: PhotoAlbumViewController?
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc override public func checkPermissions(_ call: CAPPluginCall) {
         call.resolve(["photos": permissionState()])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc override public func requestPermissions(_ call: CAPPluginCall) {
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
             DispatchQueue.main.async { call.resolve(["photos": self.permissionState()]) }
         }
