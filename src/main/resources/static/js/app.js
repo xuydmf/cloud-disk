@@ -1020,9 +1020,6 @@ const SHRINK_MIN_BYTES = 900 * 1024;    // 小于 900KB 压不出什么，不如
 const SHRINK_MIN_GAIN = 0.3;            // 压缩后不够省 30% 就放弃
 const SHRINK_EXTS = /\.(jpe?g|png|heic|heif|webp|bmp|tiff?)$/i;
 
-let uploadOriginals = false;
-try { uploadOriginals = localStorage.getItem('cd_upload_original') === '1'; } catch (e) { /* 隐私模式 */ }
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** 解码一张图。
@@ -1240,7 +1237,7 @@ function releaseShrinkSlot() {
  * 而服务端 ImageIO 解不了 HEIC —— 缩一次顺带把「Chrome 里图片裂开」也修了。
  */
 async function shrinkImage(file) {
-    if (uploadOriginals || !file) return null;
+    if (!file) return null;
     if (file.size < SHRINK_MIN_BYTES) return null;
     const name = file.name || '';
     const type = (file.type || '').toLowerCase();
@@ -2643,30 +2640,6 @@ function bindPicker(input) {
 
 bindPicker($('#fileInput'));
 bindPicker($('#mediaInput'));
-
-/** 「原图 / 压缩」开关：默认压缩（快），要原图就点一下，选择记在本地 */
-function renderOriginalToggle() {
-    const btn = $('#origToggle');
-    if (!btn) return;
-    btn.setAttribute('aria-pressed', uploadOriginals ? 'true' : 'false');
-    btn.textContent = uploadOriginals
-        ? '正在上传原图 · 点此改为自动压缩（更快）'
-        : '大图自动压到 2560px 再传 · 点此改为上传原图';
-}
-
-const origToggle = $('#origToggle');
-if (origToggle) {
-    renderOriginalToggle();
-    origToggle.onclick = (e) => {
-        // 拖拽区整块也是「选择文件」的点击区，这个按钮不能顺带把相册也叫起来
-        e.stopPropagation();
-        uploadOriginals = !uploadOriginals;
-        try { localStorage.setItem('cd_upload_original', uploadOriginals ? '1' : '0'); } catch (err) { /* 隐私模式 */ }
-        renderOriginalToggle();
-        toast(uploadOriginals ? '已改为上传原图（更慢，但保留原始分辨率）'
-            : '已开启自动压缩：长边 2560，通常快 3~5 倍');
-    };
-}
 
 // 手机 / 平板上多给一个「照片/视频」入口：带 accept 的 input 会直达系统相册，
 // 不必经过「文件浏览」那一层——选几十张照片时，这一步省下的是实打实的等待。
