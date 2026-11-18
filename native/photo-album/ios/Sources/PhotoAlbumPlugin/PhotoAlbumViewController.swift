@@ -14,6 +14,11 @@ final class PhotoAlbumViewController: UIViewController {
     private var selectedIDs = Set<String>()
     private var thumbnailSize = CGSize.zero
     private var finishing = false
+    // 滑动多选：长按进入后，手指滑过的照片按同一方向连续勾选/取消
+    private var slideSelecting = false
+    private var slideSelectMode = true
+    private var slideTouched = Set<String>()
+    private let longPress = UILongPressGestureRecognizer()
 
     private let layout: UICollectionViewFlowLayout
     private let collectionView: UICollectionView
@@ -105,6 +110,11 @@ final class PhotoAlbumViewController: UIViewController {
                                 withReuseIdentifier: PhotoAlbumHeader.reuseID)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
+
+        longPress.minimumPressDuration = 0.2
+        longPress.cancelsTouchesInView = true
+        longPress.addTarget(self, action: #selector(handleLongPress(_:)))
+        collectionView.addGestureRecognizer(longPress)
 
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         bottomBar.backgroundColor = .systemBackground
@@ -253,6 +263,95 @@ final class PhotoAlbumViewController: UIViewController {
         f.dateFormat = "M月d日 EEEE"
         return f
     }()
+
+    // MARK: - 多选辅助
+
+    /// 切换某一张的选中态；受限 20 张，超出给一次震动提示
+    private func setSelected(_ flag: Bool, at indexPath: IndexPath) {
+        let asset = sections[indexPath.section].assets[indexPath.item]
+        if flag {
+            guard selected.count < limit, !selectedIDs.contains(asset.localIdentifier) else {
+                if selected.count >= limit {
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                    updateBar(flash: true)
+                }
+                return
+            }
+            selected.append(asset)
+            selectedIDs.insert(asset.localIdentifier)
+        } else {
+            if let idx = selected.firstIndex(where: { $0.localIdentifier == asset.localIdentifier }) {
+                selected.remove(at: idx)
+            }
+            selectedIDs.remove(asset.localIdentifier)
+        }
+        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoAlbumCell {
+            cell.setSelected(selectedIDs.contains(asset.localIdentifier))
+        }
+        updateBar()
+    }
+
+    /// 长按进入滑动多选：按第一张的当前状态决定「选」还是「取消」，滑过即连续应用
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        let point = gesture.location(in: collectionView)
+        switch gesture.state {
+        case .began:
+            guard let ip = collectionView.indexPathForItem(at: point) else { return }
+            let asset = sections[ip.section].assets[ip.item]
+            slideSelectMode = !selectedIDs.contains(asset.localIdentifier)
+            slideTouched.removeAll()
+            slideSelecting = true
+            collectionView.isScrollEnabled = false
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            applySlideSelection(at: point)
+        case .changed:
+            guard slideSelecting else { return }
+            applySlideSelection(at: point)
+        case .ended, .cancelled, .failed:
+            slideSelecting = false
+            collectionView.isScrollEnabled = true
+            slideTouched.removeAll()
+            updateBar()
+        default:
+            break
+        }
+    }
+
+    private func applySlideSelection(at point: CGPoint) {
+        guard let ip = collectionView.indexPathForItem(at: point) else { return }
+        let asset = sections[ip.section].assets[ip.item]
+        guard !slideTouched.contains(asset.localIdentifier) else { return }
+        slideTouched.insert(asset.localIdentifier)
+        setSelected(slideSelectMode, at: ip)
+    }
+
+    /// 「全选当天」：该日期分组里全选（受 limit 限制）或全部取消
+    private func toggleDaySelection(section: Int) {
+        let assets = sections[section].assets
+        guard !assets.isEmpty else { return }
+        let allSelected = assets.allSatisfy { selectedIDs.contains($0.localIdentifier) }
+        if allSelected {
+            for a in assets {
+                if let idx = selected.firstIndex(where: { $0.localIdentifier == a.localIdentifier }) {
+                    selected.remove(at: idx)
+                }
+                selectedIDs.remove(a.localIdentifier)
+            }
+        } else {
+            for a in assets {
+                guard selected.count < limit else {
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                    break
+                }
+                if !selectedIDs.contains(a.localIdentifier) {
+                    selected.append(a)
+                    selectedIDs.insert(a.localIdentifier)
+                }
+            }
+        }
+        collectionView.reloadSections(IndexSet(integer: section))
+        updateBar()
+    }
 }
 
 // MARK: - UICollectionView
@@ -281,29 +380,21 @@ extension PhotoAlbumViewController: UICollectionViewDataSource, UICollectionView
         let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind,
                                                                      withReuseIdentifier: PhotoAlbumHeader.reuseID,
                                                                      for: indexPath) as! PhotoAlbumHeader
-        header.title = sections[indexPath.section].title
+        let section = indexPath.section
+        header.title = sections[section].title
+        let assets = sections[section].assets
+        let allSelected = !assets.isEmpty && assets.allSatisfy { selectedIDs.contains($0.localIdentifier) }
+        header.selectAllTitle = allSelected ? "取消全选" : "全选"
+        header.onSelectAll = { [weak self] in
+            self?.toggleDaySelection(section: section)
+        }
         return header
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: false)
         let asset = sections[indexPath.section].assets[indexPath.item]
-        if let index = selected.firstIndex(where: { $0.localIdentifier == asset.localIdentifier }) {
-            selected.remove(at: index)
-            selectedIDs.remove(asset.localIdentifier)
-        } else {
-            guard selected.count < limit else {
-                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                updateBar(flash: true)
-                return
-            }
-            selected.append(asset)
-            selectedIDs.insert(asset.localIdentifier)
-        }
-        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoAlbumCell {
-            cell.setSelected(selectedIDs.contains(asset.localIdentifier))
-        }
-        updateBar()
+        setSelected(!selectedIDs.contains(asset.localIdentifier), at: indexPath)
     }
 }
 
@@ -448,25 +539,46 @@ final class PhotoAlbumHeader: UICollectionReusableView {
     static let reuseID = "PhotoAlbumHeader"
 
     private let label = UILabel()
+    private let selectAllButton = UIButton(type: .system)
 
     var title: String = "" {
         didSet { label.text = title }
     }
+    var selectAllTitle: String = "全选" {
+        didSet { selectAllButton.setTitle(selectAllTitle, for: .normal) }
+    }
+    var onSelectAll: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .systemBackground
+
         label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.textColor = .secondaryLabel
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
+
+        selectAllButton.setTitle("全选", for: .normal)
+        selectAllButton.titleLabel?.font = .systemFont(ofSize: 13)
+        selectAllButton.setTitleColor(.systemBlue, for: .normal)
+        selectAllButton.addTarget(self, action: #selector(selectAllTapped), for: .touchUpInside)
+        selectAllButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(selectAllButton)
+
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6)
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+
+            selectAllButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            selectAllButton.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func selectAllTapped() {
+        onSelectAll?()
     }
 }
