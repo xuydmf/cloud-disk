@@ -1439,7 +1439,7 @@ async function pickFromNativeAlbum() {
     } finally {
         hide();
     }
-    if (files && files.length) await uploadFiles(files);
+    if (files && files.length) await uploadFiles(files, { skipConfirm: true });
 }
 
 async function pickFromNative(kind) {
@@ -1605,12 +1605,14 @@ function confirmUploadBatch(files) {
     });
 }
 
-function uploadFiles(fileList) {
+function uploadFiles(fileList, opts) {
     const files = Array.from(fileList || []);
     if (!files.length) return Promise.resolve();
 
-    // 单个小文件直接传（少一次点击）；多个文件、或者单个大文件，先摆出清单确认
-    const needConfirm = files.length > 1 || files.some((f) => f.size >= SIMPLE_THRESHOLD);
+    const skipConfirm = !!(opts && opts.skipConfirm);
+    // 单个小文件直接传（少一次点击）；多个文件、或者单个大文件，先摆出清单确认。
+    // 自绘相册「选完立即导入」走 skipConfirm，选完直接开始上传，不再弹确认页。
+    const needConfirm = !skipConfirm && (files.length > 1 || files.some((f) => f.size >= SIMPLE_THRESHOLD));
     if (!needConfirm) {
         return enqueueUpload(files);
     }
@@ -2598,7 +2600,13 @@ $$('[data-close]').forEach((el) => {
 });
 
 // ---------------- 事件绑定 ----------------
-$('#pickBtn').onclick = () => openPicker('#fileInput');
+// 原生 App：上传 = 照片/视频（自绘相册），隐藏「上传文件」按钮，网页仍走文件选择器
+const nativeAlbum = !!(window.NativeShell && window.NativeShell.canPickAlbum && window.NativeShell.canPickAlbum());
+if (nativeAlbum) {
+    const pb = $('#pickBtn');
+    if (pb) pb.style.display = 'none';
+}
+$('#pickBtn').onclick = () => openPicker(nativeAlbum ? '#mediaInput' : '#fileInput');
 
 /**
  * 选完文件后，这个回调必须「立刻返回」。
@@ -2662,7 +2670,7 @@ if (origToggle) {
 
 // 手机 / 平板上多给一个「照片/视频」入口：带 accept 的 input 会直达系统相册，
 // 不必经过「文件浏览」那一层——选几十张照片时，这一步省下的是实打实的等待。
-if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+if ((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || nativeAlbum) {
     const mediaBtn = $('#pickMediaBtn');
     if (mediaBtn) {
         mediaBtn.style.display = '';
@@ -2818,7 +2826,7 @@ const dz = $('#dropzone');
 ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
 ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
 dz.addEventListener('drop', (e) => { uploadFiles(e.dataTransfer.files); });
-dz.onclick = () => openPicker('#fileInput');
+dz.onclick = () => openPicker(nativeAlbum ? '#mediaInput' : '#fileInput');
 
 // 移动端导航
 const railToggle = $('#railToggle');
