@@ -49,7 +49,15 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func pick(_ call: CAPPluginCall) {
-        guard self.call == nil else {
+        // Capacitor 可能在非主线程调用插件方法；UIViewController 的 present 必须在主线程，
+        // 否则第二次打开相册（权限已是 authorized、不再走 requestAuthorization 回调）会崩。
+        DispatchQueue.main.async { [weak self] in
+            self?.handlePick(call)
+        }
+    }
+
+    private func handlePick(_ call: CAPPluginCall) {
+        guard self.call == nil, self.album == nil else {
             call.reject("相册选择尚未结束")
             return
         }
@@ -62,10 +70,14 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
         case .notDetermined:
             PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] result in
                 DispatchQueue.main.async {
+                    guard let self = self else {
+                        call.reject("无法打开相册")
+                        return
+                    }
                     if result == .authorized || result == .limited {
-                        self?.present(limit: limit, call: call)
+                        self.present(limit: limit, call: call)
                     } else {
-                        self?.call = nil
+                        self.call = nil
                         call.reject("没有相册访问权限")
                     }
                 }
@@ -77,9 +89,16 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func present(limit: Int, call: CAPPluginCall) {
+        // 已在主线程调用
         guard let bridge = self.bridge, let host = bridge.viewController else {
             self.call = nil
             call.reject("无法打开相册")
+            return
+        }
+        // 上一次相册还在关闭动画里时，直接再 present 会抛异常闪退
+        guard host.presentedViewController == nil else {
+            self.call = nil
+            call.reject("上一个相册仍在关闭")
             return
         }
         let album = PhotoAlbumViewController(limit: limit)
