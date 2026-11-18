@@ -42,13 +42,16 @@ jobs:
         if: failure()
         run: |
           mkdir -p ci-log
-          tail -n 800 /tmp/ios-build.log > ci-log/ios-build-error.txt || true
+          if [ -f /tmp/ios-build.log ]; then
+            tail -n 800 /tmp/ios-build.log > ci-log/ios-build-error.txt
+          else
+            echo "(构建脚本未产生日志，失败发生在更早的步骤)" > ci-log/ios-build-error.txt
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B ci-log
-          git add ci-log/ios-build-error.txt
+          git add -f ci-log/ios-build-error.txt
           git commit -m "ci: iOS build error [skip ci]" || true
-          git push -f origin ci-log
+          git push -f origin HEAD:ci-log || true
 
       - uses: actions/upload-artifact@v4
         with:
