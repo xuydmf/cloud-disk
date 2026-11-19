@@ -199,7 +199,7 @@
         if (!canPickAlbum()) return [];
         let res;
         try {
-            res = await PhotoAlbum.pick({ limit: 20 });
+            res = await PhotoAlbum.pick({});
         } catch (e) {
             if (/cancel/i.test((e && e.message) || '')) return [];
             throw e;

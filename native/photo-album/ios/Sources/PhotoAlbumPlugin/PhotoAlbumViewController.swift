@@ -125,7 +125,7 @@ final class PhotoAlbumViewController: UIViewController {
         barLine.translatesAutoresizingMaskIntoConstraints = false
         bottomBar.addSubview(barLine)
 
-        countLabel.text = "已选 0/\(limit)"
+        countLabel.text = "已选 0"
         countLabel.font = .systemFont(ofSize: 13)
         countLabel.textColor = .secondaryLabel
         countLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -228,7 +228,7 @@ final class PhotoAlbumViewController: UIViewController {
     }
 
     private func updateBar(flash: Bool = false) {
-        countLabel.text = "已选 \(selected.count)/\(limit)"
+        countLabel.text = "已选 \(selected.count)"
         doneButton.isEnabled = !selected.isEmpty
         doneButton.setTitle(selected.isEmpty ? "添加" : "添加 \(selected.count)", for: .normal)
         if flash {
@@ -266,17 +266,11 @@ final class PhotoAlbumViewController: UIViewController {
 
     // MARK: - 多选辅助
 
-    /// 切换某一张的选中态；受限 20 张，超出给一次震动提示
+    /// 切换某一张的选中态（不再有张数上限）
     private func setSelected(_ flag: Bool, at indexPath: IndexPath) {
         let asset = sections[indexPath.section].assets[indexPath.item]
         if flag {
-            guard selected.count < limit, !selectedIDs.contains(asset.localIdentifier) else {
-                if selected.count >= limit {
-                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                    updateBar(flash: true)
-                }
-                return
-            }
+            guard !selectedIDs.contains(asset.localIdentifier) else { return }
             selected.append(asset)
             selectedIDs.insert(asset.localIdentifier)
         } else {
@@ -325,7 +319,7 @@ final class PhotoAlbumViewController: UIViewController {
         setSelected(slideSelectMode, at: ip)
     }
 
-    /// 「全选当天」：该日期分组里全选（受 limit 限制）或全部取消
+    /// 「全选当天」：该日期分组里全选或全部取消
     private func toggleDaySelection(section: Int) {
         let assets = sections[section].assets
         guard !assets.isEmpty else { return }
@@ -339,10 +333,6 @@ final class PhotoAlbumViewController: UIViewController {
             }
         } else {
             for a in assets {
-                guard selected.count < limit else {
-                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                    break
-                }
                 if !selectedIDs.contains(a.localIdentifier) {
                     selected.append(a)
                     selectedIDs.insert(a.localIdentifier)

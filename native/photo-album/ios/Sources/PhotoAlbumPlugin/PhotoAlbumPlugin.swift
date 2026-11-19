@@ -61,7 +61,8 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("相册选择尚未结束")
             return
         }
-        let limit = max(1, call.getInt("limit") ?? 20)
+        let rawLimit = call.getInt("limit") ?? 0
+        let limit = rawLimit > 0 ? rawLimit : Int.max
         self.call = call
 
         switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
