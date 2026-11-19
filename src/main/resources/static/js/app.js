@@ -535,6 +535,55 @@ function maybeLoadMore() {
 }
 window.addEventListener('scroll', maybeLoadMore, { passive: true });
 
+// 手机端：下拉刷新（回到顶部后继续下拉，松手重载第一页）
+(function () {
+    const el = $('#pullRefresh');
+    const txt = $('#pullText');
+    if (!el || !txt) return;
+    const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!isTouch) return;
+
+    let startY = 0;
+    let pulling = false;
+    let dist = 0;
+    let refreshing = false;
+
+    function setHeight(h) {
+        dist = h;
+        el.style.height = h > 0 ? Math.min(h, 76) + 'px' : '';
+        txt.textContent = refreshing ? '正在刷新…' : (h > 60 ? '松开刷新' : '下拉刷新');
+    }
+
+    document.addEventListener('touchstart', (e) => {
+        if (refreshing) return;
+        if (window.scrollY <= 0 && e.touches.length === 1) {
+            pulling = true;
+            startY = e.touches[0].clientY;
+            dist = 0;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (!pulling || refreshing) return;
+        const dy = e.touches[0].clientY - startY;
+        setHeight(dy > 0 ? dy * 0.5 : 0);
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+        if (!pulling) return;
+        pulling = false;
+        if (refreshing) return;
+        if (dist < 60) { setHeight(0); return; }
+        refreshing = true;
+        setHeight(50);
+        currentPage = 1;
+        loadFiles().finally(() => {
+            refreshing = false;
+            setHeight(0);
+        });
+    });
+})();
+
 /** 网格里的日期分组头：今天 · 周日 · 19 项 · 78.4 MB */
 function renderDayHead(day) {
     const head = document.createElement('div');

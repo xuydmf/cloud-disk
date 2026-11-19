@@ -3708,3 +3708,37 @@ body.selecting .main { padding-bottom: 96px; }
     .modal-media img.gal-next,
     .modal-media img.gal-prev { animation: none; }
 }
+
+/* ============================================================
+   下拉刷新（仅触摸设备）
+   ============================================================ */
+.pull-refresh {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 8px;
+    z-index: 120;
+    background: var(--canvas);
+    pointer-events: none;
+}
+.pull-spin {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--line-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: pullSpin .7s linear infinite;
+}
+.pull-text {
+    font-size: 12.5px;
+    color: var(--text-2);
+}
+@keyframes pullSpin {
+    to { transform: rotate(360deg); }
+}
