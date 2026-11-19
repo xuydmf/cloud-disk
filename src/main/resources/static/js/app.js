@@ -204,7 +204,8 @@ function renderStats() {
 }
 
 // ---------------- 列表（分页） ----------------
-async function loadFiles() {
+async function loadFiles(opts) {
+    const append = !!(opts && opts.append);
     let url = `/api/files?page=${currentPage}&size=${PAGE_SIZE}`;
     if (currentType) url += '&type=' + encodeURIComponent(currentType);
     if (currentKeyword) url += '&keyword=' + encodeURIComponent(currentKeyword);
@@ -216,11 +217,12 @@ async function loadFiles() {
     totalCount = p.total || 0;
     totalPages = p.pages || 0;
     currentPage = p.page || 1;
-    renderGrid(p.records || []);
+    if (append) appendGrid(p.records || []);
+    else renderGrid(p.records || []);
     renderPagination();
     updateTitle();
     renderStats();
-    loadDateBar();   // 日期条和列表用同一套过滤条件，跟着一起刷新
+    if (!append) loadDateBar();   // 日期条和列表用同一套过滤条件，追加页时不必重拉
 }
 
 // ---------------- 日期（相册按天分组） ----------------
@@ -497,6 +499,41 @@ function renderGrid(list) {
     });
     syncSelection();
 }
+
+/** 无限滚动：把下一页追加到网格末尾，不重画已有卡片（避免图片重新加载闪一下） */
+function appendGrid(list) {
+    const grid = $('#grid');
+    if (!grid || !list.length) return;
+    const prev = lastRecords[lastRecords.length - 1];
+    lastRecords = lastRecords.concat(list);
+    lastPageCount = lastRecords.length;
+    let lastDay = prev ? dayKeyOf(prev) : null;
+    list.forEach((f) => {
+        const day = dayKeyOf(f);
+        if (day !== lastDay) {
+            grid.appendChild(renderDayHead(day));
+            lastDay = day;
+        }
+        grid.appendChild(renderCard(f));
+    });
+    syncSelection();
+    refreshDayHeads();
+}
+
+// 手机端：滑动到底部自动加载下一页（无限滚动），不再手动点「下一页」
+let loadingMore = false;
+function maybeLoadMore() {
+    const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!isTouch) return;
+    if (loadingMore) return;
+    if (currentPage >= totalPages) return;
+    const nearBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 700);
+    if (!nearBottom) return;
+    loadingMore = true;
+    currentPage += 1;
+    loadFiles({ append: true }).finally(() => { loadingMore = false; });
+}
+window.addEventListener('scroll', maybeLoadMore, { passive: true });
 
 /** 网格里的日期分组头：今天 · 周日 · 19 项 · 78.4 MB */
 function renderDayHead(day) {
