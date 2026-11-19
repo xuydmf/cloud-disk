@@ -1760,24 +1760,8 @@ async function doUpload(fileList) {
             item.f = file;
         }
 
-        const job = { blob: item.f, name: item.f.name || 'file', size: item.f.size || item.size, type: item.type };
-        if (!/^image\//.test(item.type) && !SHRINK_EXTS.test(item.f.name || '')) return job;
-        st.label = '压缩 ' + (item.f.name || '');
-        ctx.paint();
-        await shrinkSlot();
-        let small = null;
-        try {
-            small = await shrinkImage(item.f);
-        } finally {
-            releaseShrinkSlot();
-        }
-        if (!small) {
-            st.label = '';
-            return job;
-        }
-        // 总量跟着改成压缩后的字节：进度条按「张数」走，但已传/总量得说真话
-        ctx.addTotal(small.size - item.size);
-        return { blob: small, name: small.name, size: small.size, type: 'image/jpeg', shrunk: item.size };
+        // 原图上传：图片、视频都不压缩，直接用原文件
+        return { blob: item.f, name: item.f.name || 'file', size: item.f.size || item.size, type: item.type };
     };
 
     const worker = async () => {
