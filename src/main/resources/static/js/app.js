@@ -809,6 +809,7 @@ function imageRecordsOf(records) {
 }
 
 function previewImage(id) {
+    resetViewTransform();
     galleryList = imageRecordsOf(lastRecords);
     galleryIndex = galleryList.findIndex((f) => f.id === id);
     $('#imageModal').hidden = false;
@@ -827,6 +828,7 @@ function previewImage(id) {
 function renderGallery(index, dir) {
     const file = galleryList[index];
     if (!file) return;
+    resetViewTransform();
     galleryIndex = index;
     galleryDir = dir;
     renderGalleryMeta(file);
@@ -836,6 +838,33 @@ function renderGallery(index, dir) {
 // 每次换图 +1，用来丢弃上一张图迟到的 onload/onerror
 let imgToken = 0;
 let galFront = null;            // 当前可见的那一层
+
+// 旋转 / 缩放 / 平移状态：作用在两层 <img> 上，换图时整体重置
+let viewRot = 0;
+let viewScale = 1;
+let viewTX = 0;
+let viewTY = 0;
+
+function applyViewTransform() {
+    const t = `translate(${viewTX}px, ${viewTY}px) scale(${viewScale}) rotate(${viewRot}deg)`;
+    const a = $('#imagePreview');
+    const b = $('#imagePreviewB');
+    if (a) a.style.transform = t;
+    if (b) b.style.transform = t;
+}
+
+function resetViewTransform() {
+    viewScale = 1;
+    viewTX = 0;
+    viewTY = 0;
+    viewRot = 0;
+    applyViewTransform();
+}
+
+function rotateImage() {
+    viewRot = (viewRot + 90) % 360;
+    applyViewTransform();
+}
 /**
  * 预解码缓存：url → Promise<HTMLImageElement|null>。
  *
@@ -957,14 +986,31 @@ function renderGalleryMeta(file) {
 
     const prev = $('#imgPrev');
     const next = $('#imgNext');
+    const hasNextPage = currentPage < totalPages;
+    const atEnd = galleryIndex >= total - 1 && !hasNextPage;
     if (prev) prev.disabled = galleryIndex <= 0;
-    if (next) next.disabled = !multi || galleryIndex >= total - 1;
+    // 到了本页最后一张但还有下一页时，「下一张」保持可点，点击会自动加载下一页
+    if (next) next.disabled = !multi || atEnd;
 }
 
-function stepImage(delta) {
+async function stepImage(delta) {
+    // 向后走到末尾且还有下一页：自动加载下一页后继续往后翻
+    if (delta > 0 && galleryIndex + 1 >= galleryList.length && currentPage < totalPages) {
+        await loadMoreForGallery();
+        if (galleryIndex + 1 < galleryList.length) renderGallery(galleryIndex + 1, 1);
+        return;
+    }
     const target = galleryIndex + delta;
     if (target < 0 || target >= galleryList.length) return;
     renderGallery(target, delta);
+}
+
+/** 预览里翻到底自动加载下一页：追加到 lastRecords 后重建图片列表 */
+async function loadMoreForGallery() {
+    currentPage += 1;
+    await loadFiles({ append: true });
+    galleryList = imageRecordsOf(lastRecords);
+    renderGalleryMeta(galleryList[galleryIndex] || null);
 }
 
 function playVideo(id) {
@@ -2775,6 +2821,7 @@ $('#batchClear').onclick = clearSelection;
 // 图片画廊：箭头切换（换图与动画都在 showImage 里处理，两层交叉切换）
 $('#imgPrev').onclick = () => stepImage(-1);
 $('#imgNext').onclick = () => stepImage(1);
+$('#imgRotate').onclick = rotateImage;
 
 const galleryStageEl = $('#galleryStage');
 
@@ -2809,60 +2856,124 @@ window.addEventListener('resize', () => {
     if ($('#videoModal') && !$('#videoModal').hidden) fitVideoBox();
 });
 
-// 触屏 / 鼠标拖拽左右滑动
+// 触屏手势：左右滑动翻页 · 双指缩放 · 放大后单指平移（旋转走右上角按钮）
+const pointers = new Map();        // pointerId -> {x, y}
+let pinchStartDist = 0;
+let pinchStartScale = 1;
+let panStart = null;               // {x, y, tx, ty}
 let swipeX = null;
 let swipeY = null;
 let swipeId = null;
-let swipeCaptured = false;   // 是否已经在这次拖拽里捕获了指针
-let swipeMoved = false;      // 是否确认过是横向拖拽（不是点按）
-// 绑在舞台上而不是那张 <img> 上：换图时可见的层会在两层之间切换，
-// 绑到图片上的话，切过去之后手势就失灵了
+let swipeCaptured = false;         // 是否已经捕获指针
+let swipeMoved = false;            // 是否确认是横向拖拽（不是点按）
+// 绑在舞台上而不是那张 <img> 上：换图时可见的层会在两层之间切换，绑图片上会失灵
 const swipeTarget = galleryStageEl || $('#imagePreview');
 
-function resetSwipe() {
+function resetGesture() {
     swipeX = null;
     swipeY = null;
     swipeId = null;
     swipeCaptured = false;
     swipeMoved = false;
+    panStart = null;
 }
 
 swipeTarget.addEventListener('pointerdown', (e) => {
-    // 只跟左键 / 单指；按在按钮上的手势不算翻页（关闭键要能正常收到 click）
-    if (e.button !== 0) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.target && e.target.closest && e.target.closest('button')) return;
-    swipeX = e.clientX;
-    swipeY = e.clientY;
-    swipeId = e.pointerId;
-    swipeCaptured = false;
-    swipeMoved = false;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1) {
+        swipeX = e.clientX;
+        swipeY = e.clientY;
+        swipeId = e.pointerId;
+        swipeCaptured = false;
+        swipeMoved = false;
+        panStart = null;
+    } else if (pointers.size === 2) {
+        const pts = Array.from(pointers.values());
+        pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+        pinchStartScale = viewScale;
+        swipeMoved = false;
+        swipeCaptured = false;
+    }
 });
 
-// 只有确认是横向拖拽之后才捕获指针。
-// 以前 pointerdown 就 setPointerCapture，pointerup 和随后的 click 会被改派给舞台，
-// 舞台里那几个 data-close 按钮（右上角 X）永远收不到 click —— 点了没反应。
-// 点按本身不需要捕获，所以延后到移动超过阈值再捕获，既保留滑动手势，也不影响点击。
 swipeTarget.addEventListener('pointermove', (e) => {
-    if (swipeX === null || e.pointerId !== swipeId || swipeCaptured) return;
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // 双指：捏合缩放
+    if (pointers.size >= 2) {
+        const pts = Array.from(pointers.values());
+        const d = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+        viewScale = Math.min(6, Math.max(1, pinchStartScale * d / pinchStartDist));
+        applyViewTransform();
+        return;
+    }
+
+    if (e.pointerId !== swipeId) return;
     const dx = e.clientX - swipeX;
     const dy = e.clientY - swipeY;
-    if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return;
-    try { swipeTarget.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
-    swipeCaptured = true;
-    swipeMoved = true;
+
+    // 已放大：单指拖动平移画面
+    if (viewScale > 1.01) {
+        if (!panStart) {
+            panStart = { x: e.clientX, y: e.clientY, tx: viewTX, ty: viewTY };
+            try { swipeTarget.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+        }
+        viewTX = panStart.tx + (e.clientX - panStart.x);
+        viewTY = panStart.ty + (e.clientY - panStart.y);
+        applyViewTransform();
+        return;
+    }
+
+    // 未放大：横向滑动翻页。确认横向后再捕获，避免把关闭键的 click 抢走
+    if (!swipeMoved && !swipeCaptured) {
+        if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return;
+        try { swipeTarget.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+        swipeCaptured = true;
+        swipeMoved = true;
+    }
 });
 
 swipeTarget.addEventListener('pointerup', (e) => {
-    if (swipeX === null || e.pointerId !== swipeId) return;
-    const dx = e.clientX - swipeX;
-    const dy = e.clientY - swipeY;
-    const dragged = swipeMoved && Math.abs(dx) >= 48 && Math.abs(dx) >= Math.abs(dy) * 1.2;
-    resetSwipe();
-    if (dragged) stepImage(dx < 0 ? 1 : -1);
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+
+    if (pointers.size === 0) {
+        if (swipeMoved && swipeId === e.pointerId) {
+            const dx = e.clientX - swipeX;
+            const dy = e.clientY - swipeY;
+            if (Math.abs(dx) >= 48 && Math.abs(dx) >= Math.abs(dy) * 1.2) stepImage(dx < 0 ? 1 : -1);
+        }
+        resetGesture();
+        if (viewScale < 1.02) {
+            viewScale = 1;
+            viewTX = 0;
+            viewTY = 0;
+            applyViewTransform();
+        }
+    } else {
+        // 双指 → 单指：用剩下的那根手指重新起手势，避免残留位移误翻页
+        const entry = Array.from(pointers.entries())[0];
+        swipeX = entry[1].x;
+        swipeY = entry[1].y;
+        swipeId = entry[0];
+        swipeCaptured = false;
+        swipeMoved = false;
+        panStart = null;
+    }
 });
-swipeTarget.addEventListener('pointercancel', resetSwipe);
+
+swipeTarget.addEventListener('pointercancel', () => {
+    pointers.clear();
+    resetGesture();
+});
 // 已捕获时 pointerup 一定会回到舞台，别让 pointerleave 把这次拖拽提前取消
-swipeTarget.addEventListener('pointerleave', () => { if (!swipeCaptured) resetSwipe(); });
+swipeTarget.addEventListener('pointerleave', () => {
+    if (!swipeCaptured && pointers.size === 0) resetGesture();
+});
 
 // 拖拽
 const dz = $('#dropzone');

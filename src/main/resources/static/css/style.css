@@ -1682,6 +1682,7 @@ body[data-view="list"] .list-head {
     width: min(92vw, 1400px);
     height: min(88vh, 900px);
     overflow: hidden;
+    touch-action: none;      /* 手势全交给 JS：滑动翻页 / 双指缩放 / 平移 */
 }
 
 .gallery-stage .gal-layer {
@@ -1778,6 +1779,36 @@ body[data-view="list"] .list-head {
     background: rgba(255, 255, 255, .24);
     border-color: rgba(255, 255, 255, .30);
     color: #fff;
+}
+
+/* 图片预览右上角的「旋转」按钮：样式和关闭键一致，放在关闭键左边 */
+.media-btn {
+    position: absolute;
+    top: 12px;
+    right: 52px;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: background .14s var(--ease), border-color .14s var(--ease), transform .1s var(--ease);
+}
+.media-btn svg { width: 14px; height: 14px; }
+.media-btn:hover {
+    background: rgba(255, 255, 255, .24);
+    border-color: rgba(255, 255, 255, .30);
+}
+.media-btn:active { transform: scale(.94); }
+@media (max-width: 560px) {
+    .media-btn { right: 46px; }
 }
 
 /* 视频弹窗必须给一个由视口决定的"舞台"尺寸。

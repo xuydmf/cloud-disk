@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>云盘 · 文件工作台</title>
-<link rel="stylesheet" href="css/style.css?v=20261113a">
+<link rel="stylesheet" href="css/style.css?v=20261120a">
 </head>
 <body data-view="grid">
 
@@ -232,6 +232,9 @@
         <button class="modal-close" type="button" data-close="imageModal" aria-label="关闭">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
         </button>
+        <button class="media-btn" id="imgRotate" type="button" aria-label="旋转" title="旋转">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </button>
         <!-- 两层叠着放：下一张先解到隐藏层，解码完再切上来，换图时不会出现空帧和重排 -->
         <img id="imagePreview" class="gal-layer" alt="预览">
         <img id="imagePreviewB" class="gal-layer" alt="" hidden>
@@ -341,6 +344,6 @@
 <script src="js/dialog.js"></script>
 <script src="js/api-bridge.js?v=20261112b"></script>
 <script src="js/native.js?v=20261113b"></script>
-<script src="js/app.js?v=20261119c"></script>
+<script src="js/app.js?v=20261120a"></script>
 </body>
 </html>
