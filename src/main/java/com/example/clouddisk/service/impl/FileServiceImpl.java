@@ -46,6 +46,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 文件业务实现
@@ -1014,8 +1015,12 @@ public class FileServiceImpl implements FileService {
                     out.getAbsolutePath());
             pb.redirectErrorStream(true);
             Process p = pb.start();
-            int code = p.waitFor();
-            return code == 0 && out.exists() && out.length() > 0;
+            boolean finished = p.waitFor(30, TimeUnit.SECONDS);
+            if (!finished) {
+                p.destroyForcibly();
+                return false;
+            }
+            return p.exitValue() == 0 && out.exists() && out.length() > 0;
         } catch (Exception e) {
             log.warn("ffmpeg 生成 JPEG 失败: {}", src.getName(), e);
             return false;
