@@ -529,11 +529,36 @@ public class FileServiceImpl implements FileService {
     @Override
     public File resolveThumbFile(Long id) {
         FileInfo info = getById(id);
-        if (info.getThumbPath() == null || info.getThumbPath().isEmpty()) {
+        if (info == null) {
             return null;
         }
-        File f = new File(storageRoot, info.getThumbPath());
-        return f.exists() ? f : null;
+        if (info.getThumbPath() != null && !info.getThumbPath().isEmpty()) {
+            File f = new File(storageRoot, info.getThumbPath());
+            if (f.exists()) {
+                return f;
+            }
+        }
+        // 没有缩略图（比如旧的 HEIC 上传时生成失败）：现场补生成一张，别再回退原图
+        if (FileType.IMAGE.name().equals(info.getFileType())) {
+            File src = new File(storageRoot, info.getFilePath());
+            if (src.exists()) {
+                String relativeDir = info.getFilePath().contains("/")
+                        ? info.getFilePath().substring(0, info.getFilePath().lastIndexOf('/'))
+                        : "";
+                String generated = generateImageThumb(src, relativeDir, info.getStoredName());
+                if (generated != null) {
+                    FileInfo update = new FileInfo();
+                    update.setId(id);
+                    update.setThumbPath(generated);
+                    fileInfoMapper.updateById(update);
+                    File thumb = new File(storageRoot, generated);
+                    if (thumb.exists()) {
+                        return thumb;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
