@@ -67,7 +67,7 @@ file:
   # ffmpeg 可执行文件路径；若已加入系统 PATH，直接写 ffmpeg 即可
   # Apple 手机视频(MOV/HEVC)需转码为 H.264 MP4 才能在 Chrome/Firefox 播放
   ffmpeg:
-    path: ffmpeg
+    path: F:/ffmpeg/ffmpeg.exe
     # 是否对所有视频强制转码（true=全部转码为 mp4，false=仅转码非 mp4 的封装如 mov/avi 等）
     force-transcode: false
 

@@ -591,6 +591,14 @@ public class FileServiceImpl implements FileService {
                 }
                 return out.exists() ? out : null;
             } catch (Exception e) {
+                // ImageIO 解不了（HEIC/HEIF 等）：改用 ffmpeg 生成预览图
+                if (ffmpegToJpeg(src, tmp, PREVIEW_MAX_EDGE)) {
+                    if (tmp.renameTo(out)) {
+                        return out.exists() ? out : null;
+                    }
+                    tmp.delete();
+                    return null;
+                }
                 // 解码失败（少见格式、文件损坏）：退回原图，让浏览器自己试
                 log.warn("预览图生成失败，回退原图 id={}: {}", info.getId(), e.getMessage());
                 tmp.delete();
@@ -760,30 +768,27 @@ public class FileServiceImpl implements FileService {
     }
 
     private String generateImageThumb(File src, String relativeDir, String storedName) {
+        int[] dim = readImageSize(src);
+        // 原图本来就不大（手机截图、聊天转发的小图）：直接让 /thumb 回退到原图，
+        // 省掉一次「解码 + 缩放 + 重编码」。这一步在批量上传时省下的是成倍的时间。
+        if (dim != null && Math.max(dim[0], dim[1]) <= THUMB_SKIP_EDGE) {
+            return null;
+        }
+        String thumbName = "thumb_" + storedName + ".jpg";
+        File out = new File(new File(storageRoot, relativeDir), thumbName);
+        long t0 = System.currentTimeMillis();
+
+        // 快路：抽样解码 + 自己缩放。12MP 照片缩到 320 只需解 1/16 的像素。
+        if (writeScaledJpeg(src, out, THUMB_MAX_EDGE, 0.82f)) {
+            if (log.isDebugEnabled()) {
+                log.debug("[thumb] {}ms {} ({}x{})", System.currentTimeMillis() - t0,
+                        src.getName(), dim == null ? 0 : dim[0], dim == null ? 0 : dim[1]);
+            }
+            return relativeDir + "/" + thumbName;
+        }
+
+        // 兜底1：解码器不支持抽样时仍用 Thumbnailator
         try {
-            int[] dim = readImageSize(src);
-            // 原图本来就不大（手机截图、聊天转发的小图）：直接让 /thumb 回退到原图，
-            // 省掉一次「解码 + 缩放 + 重编码」。这一步在批量上传时省下的是成倍的时间。
-            if (dim != null && Math.max(dim[0], dim[1]) <= THUMB_SKIP_EDGE) {
-                return null;
-            }
-            String thumbName = "thumb_" + storedName + ".jpg";
-            File dir = new File(storageRoot, relativeDir);
-            File out = new File(dir, thumbName);
-            long t0 = System.currentTimeMillis();
-
-            // 快路：抽样解码 + 自己缩放。12MP 照片缩到 320 只需解 1/16 的像素，
-            // 实测 225ms → 152ms（同一张 4032×3024 的 JPEG）；批量 20 张就是几秒钟。
-            if (writeScaledJpeg(src, out, THUMB_MAX_EDGE, 0.82f)) {
-                if (log.isDebugEnabled()) {
-                    log.debug("[thumb] {}ms {} ({}x{})", System.currentTimeMillis() - t0,
-                            src.getName(), dim == null ? 0 : dim[0], dim == null ? 0 : dim[1]);
-                }
-                return relativeDir + "/" + thumbName;
-            }
-
-            // 兜底：解码器不支持抽样（少见编码 / 特殊色彩空间）时仍用 Thumbnailator，
-            // 行为与改动前完全一致。
             Thumbnails.of(src)
                     .size(THUMB_MAX_EDGE, THUMB_MAX_EDGE)
                     .keepAspectRatio(true)
@@ -791,10 +796,18 @@ public class FileServiceImpl implements FileService {
                     .outputFormat("jpg")
                     .toFile(out);
             return relativeDir + "/" + thumbName;
-        } catch (IOException e) {
-            log.warn("图片缩略图生成失败: {}", src.getName(), e);
-            return null;
+        } catch (Exception e) {
+            out.delete();
+            log.debug("Thumbnailator 缩略图失败，改用 ffmpeg: {}", src.getName());
         }
+
+        // 兜底2：HEIC/HEIF 等 ImageIO 解不了的，用 ffmpeg 转 JPEG
+        if (ffmpegToJpeg(src, out, THUMB_MAX_EDGE)) {
+            return relativeDir + "/" + thumbName;
+        }
+
+        log.warn("图片缩略图生成失败: {}", src.getName());
+        return null;
     }
 
     /**
@@ -981,6 +994,30 @@ public class FileServiceImpl implements FileService {
             Process p = new ProcessBuilder(ffmpegPath, "-version").start();
             return p.waitFor() == 0;
         } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 用 ffmpeg 把任意图片（HEIC/HEIF 等 ImageIO 解不了的格式）转成 JPEG。
+     * 长边缩到 maxEdge 以内、等比、只取一帧。
+     */
+    private boolean ffmpegToJpeg(File src, File out, int maxEdge) {
+        if (!isFfmpegAvailable()) {
+            return false;
+        }
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    ffmpegPath, "-y", "-i", src.getAbsolutePath(),
+                    "-vf", "scale=" + maxEdge + ":" + maxEdge + ":force_original_aspect_ratio=decrease",
+                    "-frames:v", "1", "-q:v", "3",
+                    out.getAbsolutePath());
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            int code = p.waitFor();
+            return code == 0 && out.exists() && out.length() > 0;
+        } catch (Exception e) {
+            log.warn("ffmpeg 生成 JPEG 失败: {}", src.getName(), e);
             return false;
         }
     }
