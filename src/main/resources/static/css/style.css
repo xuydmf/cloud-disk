@@ -587,6 +587,11 @@ kbd {
 .btn-ico { width: 14px; height: 14px; display: block; flex: none; }
 .btn-ico svg { width: 100%; height: 100%; }
 
+.btn.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
 /* ---- main ---- */
 
 .main {
@@ -1069,6 +1074,7 @@ body[data-view="list"] .day-head { grid-column: auto; }
 
 .card:hover .pick,
 body.selecting .pick,
+body.pick .pick,
 .pick.checked { opacity: 1; }
 
 @media (hover: none) {
@@ -2124,7 +2130,8 @@ body[data-view="list"] .list-head {
    Batch action bar
    ============================================================ */
 
-body.selecting .main { padding-bottom: 96px; }
+body.selecting .main,
+body.pick .main { padding-bottom: 96px; }
 
 .batch-bar {
     position: fixed;
@@ -2327,6 +2334,8 @@ body.selecting .main { padding-bottom: 96px; }
        否则搜索框会被两个带文字的按钮挤出屏幕 */
     #pickMediaBtn { flex: none; padding: 0 9px; }
     #pickMediaBtn > span:not(.btn-ico) { display: none; }
+    #selectModeBtn { flex: none; padding: 0 9px; }
+    #selectModeBtn > span:not(.btn-ico) { display: none; }
 
     .crumb { display: none; }
     .dz-cta { display: none; }

@@ -24,6 +24,7 @@ let totalCount = 0;
 let lastPageCount = 0;
 let lastRecords = [];
 const selected = new Set();   // 当前勾选的文件 id
+let selectMode = false;        // 顶栏「多选」开关：开启后所有勾选框常显、批量条常驻
 let currentView = localStorage.getItem('cd_view') === 'list' ? 'list' : 'grid';
 (() => {
     const v = new URLSearchParams(location.search).get('view');
@@ -625,7 +626,7 @@ function renderCard(f) {
         thumb.title = type === 'IMAGE' ? '点击预览' : '点击播放';
         thumb.onclick = () => {
             // 已进入选择态时，点击卡片主体改为切换勾选，避免误触预览
-            if (selected.size > 0) { toggleOne(f.id); return; }
+            if (selectMode || selected.size > 0) { toggleOne(f.id); return; }
             type === 'IMAGE' ? previewImage(f.id) : playVideo(f.id);
         };
     } else {
@@ -634,7 +635,7 @@ function renderCard(f) {
         if (canEdit) thumb.classList.add('editable');
         thumb.title = canEdit ? '点击在线编辑' : '';
         thumb.onclick = () => {
-            if (selected.size > 0) { toggleOne(f.id); return; }
+            if (selectMode || selected.size > 0) { toggleOne(f.id); return; }
             if (canEdit) openFileEditor(f);
         };
     }
@@ -694,7 +695,7 @@ function syncSelection() {
     const n = selected.size;
     document.body.classList.toggle('selecting', n > 0);
     const bar = $('#batchBar');
-    if (bar) bar.hidden = n === 0;
+    if (bar) bar.hidden = (n === 0 && !selectMode);
     const cnt = $('#batchCount');
     if (cnt) cnt.textContent = n;
     const all = $('#batchAll');
@@ -732,6 +733,24 @@ function clearSelection() {
     if (selected.size === 0) return;
     selected.clear();
     applySelectionToDom();
+    syncSelection();
+}
+
+/** 顶栏「多选」开关：开启后所有勾选框常显、批量条常驻，方便批量勾选删除 */
+function setSelectMode(on) {
+    selectMode = on;
+    document.body.classList.toggle('pick', on);
+    const btn = $('#selectModeBtn');
+    if (btn) {
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.classList.toggle('on', on);
+        const span = btn.querySelector('span:not(.btn-ico)');
+        if (span) span.textContent = on ? '完成' : '多选';
+    }
+    if (!on) {
+        selected.clear();
+        applySelectionToDom();
+    }
     syncSelection();
 }
 
@@ -2785,6 +2804,7 @@ if (pickVideosBtn) {
 
 $('#viewGrid').onclick = () => setView('grid');
 $('#viewList').onclick = () => setView('list');
+$('#selectModeBtn').onclick = () => setSelectMode(!selectMode);
 
 $('#filters').addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
