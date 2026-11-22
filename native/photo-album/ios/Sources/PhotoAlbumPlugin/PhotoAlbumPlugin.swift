@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import Photos
+import UIKit
 import UniformTypeIdentifiers
 
 /**
@@ -154,8 +155,9 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// 把 PHAsset 的原文件写到临时目录。照片/视频都走 PHAssetResourceManager，
-    /// 不经过 UIImage，避免整批解码占内存；视频也不会进 JS。
+    /// 把 PHAsset 的原文件写到临时目录。视频走 PHAssetResourceManager，不进 JS；
+    /// 照片里 HEIC/HEIF 会在本机用 iOS 原生解码转成最高质量 JPEG（网格/HDR 也能解），
+    /// 其他格式直接导出原文件。
     private func write(asset: PHAsset, to dir: URL) -> [String: Any]? {
         let resources = PHAssetResource.assetResources(for: asset)
         let preferred: [PHAssetResourceType] = asset.mediaType == .video
@@ -172,6 +174,30 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
         let date = asset.creationDate ?? Date()
         let prefix = asset.mediaType == .video ? "VID" : "IMG"
         let base = "\(prefix)_\(Self.stampFormatter.string(from: date))_\(UUID().uuidString.prefix(6))"
+        let iso = ISO8601DateFormatter().string(from: date)
+
+        // HEIC/HEIF：服务端和电脑浏览器都解不了网格 HDR HEIC，改用 iOS 原生解码
+        // 输出全尺寸、最高质量 JPEG —— 只换容器，不缩小、不降质。
+        let lowerExt = ext.lowercased()
+        if asset.mediaType == .image && (lowerExt == "heic" || lowerExt == "heif") {
+            if let data = Self.fullQualityJpegData(for: asset) {
+                let dest = dir.appendingPathComponent("\(base).jpg")
+                do {
+                    try data.write(to: dest)
+                    return [
+                        "path": dest.absoluteString,
+                        "name": "\(base).jpg",
+                        "size": data.count,
+                        "type": "image/jpeg",
+                        "creationDate": iso,
+                        "isVideo": false
+                    ]
+                } catch {
+                    // 写失败就退回下面的原始导出
+                }
+            }
+        }
+
         let dest = dir.appendingPathComponent("\(base).\(ext)")
 
         let options = PHAssetResourceRequestOptions()
@@ -192,7 +218,6 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
         let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
         let mime = UTType(resource.uniformTypeIdentifier)?.preferredMIMEType
             ?? (asset.mediaType == .video ? "video/quicktime" : "image/jpeg")
-        let iso = ISO8601DateFormatter().string(from: date)
 
         return [
             "path": dest.absoluteString,
@@ -202,6 +227,26 @@ public class PhotoAlbumPlugin: CAPPlugin, CAPBridgedPlugin {
             "creationDate": iso,
             "isVideo": asset.mediaType == .video
         ]
+    }
+
+    /// 用 PHImageManager 把 HEIC/HEIF 解码成全尺寸 UIImage，再输出最高质量 JPEG。
+    /// PHImageManager 会透明地重建网格、套用 HDR 增益图，得到的就是相册里看到的样子。
+    private static func fullQualityJpegData(for asset: PHAsset) -> Data? {
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .none
+        options.isNetworkAccessAllowed = true
+        options.isSynchronous = true
+
+        var image: UIImage?
+        PHImageManager.default().requestImage(for: asset,
+                                              targetSize: PHImageManagerMaximumSize,
+                                              contentMode: .aspectFit,
+                                              options: options) { img, _ in
+            image = img
+        }
+        guard let image = image else { return nil }
+        return image.jpegData(compressionQuality: 1.0)
     }
 
     private static let stampFormatter: DateFormatter = {
