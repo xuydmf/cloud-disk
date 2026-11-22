@@ -2804,7 +2804,8 @@ if (pickVideosBtn) {
 
 $('#viewGrid').onclick = () => setView('grid');
 $('#viewList').onclick = () => setView('list');
-$('#selectModeBtn').onclick = () => setSelectMode(!selectMode);
+const selectModeBtnEl = $('#selectModeBtn');
+if (selectModeBtnEl) selectModeBtnEl.onclick = () => setSelectMode(!selectMode);
 
 $('#filters').addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
